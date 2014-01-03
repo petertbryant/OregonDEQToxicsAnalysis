@@ -3,28 +3,59 @@ library(stringr)
 library(reshape2)
 library(xlsx)
 
-source('//deqlead01/wqm/TOXICS_2012/Data/criteria.R')
-source('//deqlead01/wqm/TOXICS_2012/Data/hardness_eval_functions_Element_Names.R')
+source('//deqlead01/wqm/TOXICS_2012/Data/R/criteria.R')
+source('//deqlead01/wqm/TOXICS_2012/Data/R/hardness_eval_functions_Element_Names.R')
 
 options('scipen' = 50, stringsAsFactors = FALSE)
 
+#Pull in the Element data that is final as of 1/3/2014. This data was queried using the SQL Query tool in Element. The text of that query
+#is commented at the end of this file for future reference.
+data.2012 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01032014.csv', stringsAsFactors = FALSE)
+
+#The qualifiers from this query were concatenated into a single field which is kind of a pain to parse so in order to get Status
+#I queried the qualifier table directly and will make a status column that can then be merged with the data table.
+data.2012.qualifiers <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Qualifier_Query_for_TMP_on_01032014.csv', stringsAsFactors = FALSE)
+
+data.2012.qualifiers$id <- paste(data.2012.qualifiers$Wrk, data.2012.qualifiers$Sample, data.2012.qualifiers$Analysis, data.2012.qualifiers$Analyte)
+
+data.2012.qualifiers$Status <- substr(data.2012.qualifiers$Qualifier, nchar(data.2012.qualifiers$Qualifier),nchar(data.2012.qualifiers$Qualifier))
+
+data.2012.qualifiers$Status <- as.factor(data.2012.qualifiers$Status)
+
+data.2012.qualifiers$Status <- revalue(data.2012.qualifiers$Status, c('a' = 1, 'A' = 1, 'b' = 2, 'B' = 2, 'c' = 3, 'C' = 3, 'D' = 4, 'Q' = 5))
+
+data.2012.qualifiers$Status <- as.numeric(data.2012.qualifiers$Status)
+
+processed <- ddply(data.2012.qualifiers, .(id), 
+                   summarise, Status = max(Status))
+
+processed$Status <- as.factor(processed$Status)
+
+processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D', '5' = 'Q'))
+
+processed$Status <- as.character(processed$Status)
+
+#now that the qualifiers have been parsed and the DQL determined we can associate them with the data itself
+data.2012$id <- paste(data.2012$Wrk, data.2012$Sample, data.2012$Analysis, data.2012$Analyte)
+data.2012.w.qualifiers <- merge(data.2012, processed, by = 'id', all.x = TRUE)
+
 #this 2012 data is preliminary so it's possible some of the column names
 #will change the next time we get the data
-files.2012 <- list.files('//deqlead01/wqm/toxics_2012/data/2012 data/raw data/')
-
-for (i in 1:length(files.2012)){
-  file.path <- paste('//deqlead01/wqm/toxics_2012/data/2012 data/raw data/', files.2012[i], sep = '')
-  tmp <- read.xlsx2(file.path, sheetName = 'Data')
-  ifelse(i == 1, ref <- names(tmp), tmp <- tmp[,ref])
-  print(names(tmp))
-  ifelse(i == 1, 
-         data.2012 <- tmp,
-         data.2012 <- rbind(data.2012, tmp))
-}
-
-data.2012 <- data.2012[data.2012$Analyte != '',]
-
-data.2012[data.2012$Analyte == 'Inorganic Arsenic, Total','Analyte'] <- 'Arsenic, Total inorganic'
+# files.2012 <- list.files('//deqlead01/wqm/toxics_2012/data/2012 data/raw data/')
+# 
+# for (i in 1:length(files.2012)){
+#   file.path <- paste('//deqlead01/wqm/toxics_2012/data/2012 data/raw data/', files.2012[i], sep = '')
+#   tmp <- read.xlsx2(file.path, sheetName = 'Data')
+#   ifelse(i == 1, ref <- names(tmp), tmp <- tmp[,ref])
+#   print(names(tmp))
+#   ifelse(i == 1, 
+#          data.2012 <- tmp,
+#          data.2012 <- rbind(data.2012, tmp))
+# }
+# 
+# data.2012 <- data.2012[data.2012$Analyte != '',]
+# 
+# data.2012[data.2012$Analyte == 'Inorganic Arsenic, Total','Analyte'] <- 'Arsenic, Total inorganic'
 
 #for this analysis we can leave out blanks and field duplicates (we may want to check the duplicates later and use a detect
 #when we don't have a primary detection)
@@ -336,3 +367,28 @@ roll.up <- ddply(hm.evaluated, .(Project, SampleRegID, NAME), summarise, acute.e
 roll.up$percent.detect <- round(100*(roll.up$detect.count/roll.up$sample.count))
 
 View(data.wo.void[which(data.wo.void$exceed == 1),])
+
+
+
+# Select dbo.REPWRK.Client, dbo.REPWRK.Project, dbo.REPWRK.Wrk,
+# dbo.REPSAMPLE.Sample, dbo.REPSAMPLE.SampleAlias, dbo.REPSAMPLE.SampleRegID,
+# dbo.REPSAMPLE.SampleType, dbo.REPSAMPLE.ClientMatrix, dbo.REPSAMPLE.Sampled,
+# dbo.REPSAMPLEANALYSIS.Analysis, dbo.REPSAMPLEANALYSIS.SpecificMethod,
+# dbo.REPSAMPLEANALYTE.Analyte, dbo.REPSAMPLEANALYTE.nMRL,
+# dbo.REPSAMPLEANALYTE.tResult, dbo.REPSAMPLEANALYTE.FinalUnits As 'Unit',
+# dbo.REPSAMPLEANALYTE.AnalyteNotes as 'AnalyteQualifiers', dbo.REPSAMPLEANALYSIS.SampleNotes as 'SampleQualifiers'
+# From dbo.REPWRK Inner Join
+# dbo.REPSAMPLE On dbo.REPWRK.Wrk = dbo.REPSAMPLE.Wrk Inner Join
+# dbo.REPSAMPLEANALYSIS On dbo.REPSAMPLEANALYSIS.Sample = dbo.REPSAMPLE.Sample
+# And dbo.REPSAMPLE.Wrk = dbo.REPSAMPLEANALYSIS.Wrk Inner Join
+# dbo.REPSAMPLEANALYTE On dbo.REPSAMPLEANALYSIS.Analysis =
+#   dbo.REPSAMPLEANALYTE.Analysis And dbo.REPSAMPLEANALYSIS.Sample =
+#   dbo.REPSAMPLEANALYTE.Sample And dbo.REPSAMPLEANALYSIS.Wrk =
+#   dbo.REPSAMPLEANALYTE.Wrk
+# Where dbo.REPWRK.Wrk In (1212093, 1212094, 1212092, 1212088, 1212105, 1212103,
+#                          1212104, 1212106, 1212005, 1212010,
+#                          1212009, 1212007, 1212102, 1212099,
+#                          1212101, 1212100, 1212108, 1212107,
+#                          1212083, 1212089, 1212081, 1212082,
+#                          1212002, 1212001, 1211023, 1211024, 1211026)
+# Order By dbo.REPWRK.Wrk, dbo.REPSAMPLE.Sample, dbo.REPSAMPLEANALYTE.Analyte
