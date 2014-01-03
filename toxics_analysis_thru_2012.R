@@ -33,11 +33,54 @@ processed$Status <- as.factor(processed$Status)
 
 processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D', '5' = 'Q'))
 
-processed$Status <- as.character(processed$Status)
+processed$AnalyteStatus <- as.character(processed$Status)
+
+processed <- processed[,c('id','AnalyteStatus')]
 
 #now that the qualifiers have been parsed and the DQL determined we can associate them with the data itself
 data.2012$id <- paste(data.2012$Wrk, data.2012$Sample, data.2012$Analysis, data.2012$Analyte)
 data.2012.w.qualifiers <- merge(data.2012, processed, by = 'id', all.x = TRUE)
+
+#the above only captures the analyte level qualifiers. the below will also capture the sample level qualifiers
+sample.qualifiers <- data.2012.qualifiers[data.2012.qualifiers$Analyte == '',]
+
+sample.qualifiers$sid <- paste(sample.qualifiers$Wrk, sample.qualifiers$Sample, sample.qualifiers$Analysis)
+
+sample.qualifiers$Status <- substr(sample.qualifiers$Qualifier, nchar(sample.qualifiers$Qualifier),nchar(sample.qualifiers$Qualifier))
+
+sample.qualifiers$Status <- as.factor(sample.qualifiers$Status)
+
+sample.qualifiers$Status <- revalue(sample.qualifiers$Status, c('a' = 1, 'A' = 1, 'B' = 2, 'D' = 4, 'Q' = 5))
+
+sample.qualifiers$Status <- as.numeric(sample.qualifiers$Status)
+
+processed <- ddply(sample.qualifiers, .(sid), 
+                   summarise, Status = max(Status))
+
+processed$Status <- as.factor(processed$Status)
+
+processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D'))
+
+processed$SampleStatus <- as.character(processed$Status)
+
+processed <- processed[,c('sid','SampleStatus')]
+
+data.2012.w.qualifiers$sid <- paste(data.2012.w.qualifiers$Wrk, data.2012.w.qualifiers$Sample, data.2012.w.qualifiers$Analysis)
+data.2012.w.qualifiers <- merge(data.2012.w.qualifiers, processed, by = 'sid', all.x = TRUE)
+
+#This brings the status into a single column
+data.2012.w.qualifiers$Status <- ifelse(is.na(data.2012.w.qualifiers$AnalyteStatus),
+                                        ifelse(is.na(data.2012.w.qualifiers$SampleStatus),
+                                               'A',
+                                               data.2012.w.qualifiers$SampleStatus),
+                                        data.2012.w.qualifiers$AnalyteStatus)
+
+#i want to check on whether all voided samples should be DQL 'D'. if so, add the code to do that here
+
+#this simplifies the qualifier and status columns and writes it back to the dataframe name that is used from here on
+data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
+
+
 
 #this 2012 data is preliminary so it's possible some of the column names
 #will change the next time we get the data
