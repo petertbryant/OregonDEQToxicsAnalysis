@@ -76,6 +76,9 @@ data.2012.w.qualifiers$Status <- ifelse(is.na(data.2012.w.qualifiers$AnalyteStat
                                         data.2012.w.qualifiers$AnalyteStatus)
 
 #i want to check on whether all voided samples should be DQL 'D'. if so, add the code to do that here
+data.2012.w.qualifiers$Status <- ifelse(data.2012.w.qualifiers$tResult %in% c('Void', 'Cancelled'),
+                                        'D',
+                                        data.2012.w.qualifiers$Status)
 
 #this simplifies the qualifier and status columns and writes it back to the dataframe name that is used from here on
 data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
