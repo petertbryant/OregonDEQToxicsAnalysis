@@ -22,16 +22,15 @@ data.2012.qualifiers$Status <- substr(data.2012.qualifiers$Qualifier, nchar(data
 
 data.2012.qualifiers$Status <- as.factor(data.2012.qualifiers$Status)
 
-data.2012.qualifiers$Status <- revalue(data.2012.qualifiers$Status, c('a' = 1, 'A' = 1, 'b' = 2, 'B' = 2, 'c' = 3, 'C' = 3, 'D' = 4, 'Q' = 5))
+data.2012.qualifiers$Status <- revalue(data.2012.qualifiers$Status, c('a' = 1, 'A' = 1, 'b' = 2, 'B' = 2, 'c' = 3, 'C' = 3, 'D' = 4, 'Q' = 1))
 
 data.2012.qualifiers$Status <- as.numeric(data.2012.qualifiers$Status)
 
-processed <- ddply(data.2012.qualifiers, .(id), 
-                   summarise, Status = max(Status))
+processed <- ddply(data.2012.qualifiers, .(id), summarise, Status = max(Status))
 
 processed$Status <- as.factor(processed$Status)
 
-processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D', '5' = 'Q'))
+processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D'))
 
 processed$AnalyteStatus <- as.character(processed$Status)
 
@@ -50,12 +49,11 @@ sample.qualifiers$Status <- substr(sample.qualifiers$Qualifier, nchar(sample.qua
 
 sample.qualifiers$Status <- as.factor(sample.qualifiers$Status)
 
-sample.qualifiers$Status <- revalue(sample.qualifiers$Status, c('a' = 1, 'A' = 1, 'B' = 2, 'D' = 4, 'Q' = 5))
+sample.qualifiers$Status <- revalue(sample.qualifiers$Status, c('a' = 1, 'A' = 1, 'B' = 2, 'D' = 4, 'Q' = 1))
 
 sample.qualifiers$Status <- as.numeric(sample.qualifiers$Status)
 
-processed <- ddply(sample.qualifiers, .(sid), 
-                   summarise, Status = max(Status))
+processed <- ddply(sample.qualifiers, .(sid), summarise, Status = max(Status))
 
 processed$Status <- as.factor(processed$Status)
 
