@@ -2,6 +2,7 @@ library(plyr)
 library(stringr)
 library(reshape2)
 library(xlsx)
+library(ggplot2)
 
 source('//deqlead01/wqm/TOXICS_2012/Data/R/criteria.R')
 source('//deqlead01/wqm/TOXICS_2012/Data/R/hardness_eval_functions_Element_Names.R')
@@ -10,7 +11,7 @@ options('scipen' = 50, stringsAsFactors = FALSE)
 
 #Pull in the Element data that is final as of 1/3/2014. This data was queried using the SQL Query tool in Element. The text of that query
 #is commented at the end of this file for future reference.
-data.2012 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01032014.csv', stringsAsFactors = FALSE)
+data.2012 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
 
 #The qualifiers from this query were concatenated into a single field which is kind of a pain to parse so in order to get Status
 #I queried the qualifier table directly and will make a status column that can then be merged with the data table.
@@ -103,11 +104,11 @@ data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','Sampl
 
 #for this analysis we can leave out blanks and field duplicates (we may want to check the duplicates later and use a detect
 #when we don't have a primary detection)
-data.2012 <- data.2012[!data.2012$Sampletype %in% c('Blank - Equipment::EB', 'Blank - Transfer::TfB', 'Field Duplicate::FD'),]
+data.2012 <- data.2012[!data.2012$SampleType %in% c('Blank - Equipment::EB', 'Blank - Transfer::TfB', 'Field Duplicate::FD'),]
 
 #this process was initially developed with LASAR data so I will change the element names to lasar names for now
 # i want to go the other way eventually but just want to see some results right now
-data.2012 <- data.2012[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'Sampletype','Analyte','tResult', 'tMRL', 'Units', 'SpecificMethod', 'AnalyteQualifiers')]
+data.2012 <- data.2012[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'SampleType','Analyte','tResult', 'tMRL', 'Unit', 'SpecificMethod', 'Status')]
 #data.2012 <- rename(data.2012, c('Project' = 'SUBPROJECT_NAME', 'SampleRegID' = 'STATION', 'SampleAlias' = 'DESCRIPTION','Sampled' = 'SAMPLE_DATE', 'Analyte' = 'NAME',
 #                                 'tResult' = 'PRV', 'tMRL' = 'METHOD_REPORTING_LIMIT', 'Units' = 'UNIT', 'SpecificMethod' = 'METHOD_CODE'))
 
@@ -152,14 +153,14 @@ willy.metals.melted$SampleRegID <- substr(willy.metals.melted$SampleRegID, 1, 5)
 willy.metals.melted$SpecificMethod <- '200.8'
 willy.metals.melted$Project <- 'TMP-Water-Willamette'
 willy.metals.melted$tMRL<- NA
-willy.metals.melted$Units <- willy.metals.melted$Analyte
-willy.metals.melted$Units <- mapvalues(willy.metals.melted$Units, 
+willy.metals.melted$Unit <- willy.metals.melted$Analyte
+willy.metals.melted$Unit <- mapvalues(willy.metals.melted$Unit, 
                                       from = unique(willy.metals.melted$Analyte), 
                                       to = c('µg/L','µg/L','µg/L','µg/L','µg/L','mg/L','µg/L','µg/L','µg/L','µg/L',
                                              'µg/L','mg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L'))
 willy.metals.melted$tResult <- ifelse(substr(willy.metals.melted$tResult,1,1) == '<','ND',willy.metals.melted$tResult)
-willy.metals.melted$AnalyteQualifiers <- ''
-willy.metals.melted$Sampletype <- ''
+willy.metals.melted$Status <- 'A'
+willy.metals.melted$SampleType <- ''
 
 data.2011 <- data.2011[,names(willy.data)]
 
@@ -177,8 +178,8 @@ lasar[lasar$METHOD_CODE == '200.8','NAME'] <- gsub('R', 'r', (paste(lasar[lasar$
 
 
 lasar <- rename(lasar, c('SUBPROJECT_NAME' = 'Project', 'STATION' = 'SampleRegID', 'DESCRIPTION' = 'SampleAlias','SAMPLE_DATE' = 'Sampled', 
-                         'QA_QC_TYPE' = 'Sampletype','NAME' = 'Analyte', 'PRV' = 'tResult', 'METHOD_REPORTING_LIMIT' = 'tMRL', 'UNIT' = 'Units', 
-                         'METHOD_CODE' = 'SpecificMethod', 'STATUS' = 'AnalyteQualifiers'))
+                         'QA_QC_TYPE' = 'SampleType','NAME' = 'Analyte', 'PRV' = 'tResult', 'METHOD_REPORTING_LIMIT' = 'tMRL', 'UNIT' = 'Unit', 
+                         'METHOD_CODE' = 'SpecificMethod', 'STATUS' = 'Status'))
 
 #this makes the columns in the LASAR data match the columns in the Element data frame
 lasar <- lasar[,names(data.2012)]
@@ -227,8 +228,10 @@ categories.mapped.vector <- categories.mapped$Analyte
 names(categories.mapped.vector) <- categories.mapped$categories.Chemical
 categories$Chemical <- as.factor(categories$Chemical)
 categories$Chemical <- revalue(categories$Chemical, categories.mapped.vector)
+categories$Chemical <- as.character(categories$Chemical)
 
 categories.sub <- categories[,c('Chemical','chem.group')]
+categories.sub <- categories.sub[!duplicated(categories.sub$Chemical),]
 
 data.w.categories <- merge(data, categories.sub, by.x = 'Analyte', by.y = 'Chemical', all.x = TRUE)
 unmatched.analytes <- unique(data.w.categories[is.na(data.w.categories$chem.group),'Analyte'])
@@ -249,12 +252,71 @@ data.wo.void$tMRL<- as.numeric(data.wo.void$tMRL)
 #this converts the tResult to a numeric field
 data.wo.void$tResult <- as.numeric(data.wo.void$tResult)
 
+#Apparently the reporting limit for DEET has been raised to 30 per Lori
+data.wo.void[data.wo.void$Analyte == 'DEET','tMRL'] <- 30
+
 #populate the detect.nondetect column
 data.wo.void[!is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void[!is.na(data.wo.void$tMRL),'tResult'] 
                                                                      < data.wo.void[!is.na(data.wo.void$tMRL),'tMRL'],
                                                                      0, 1)
 data.wo.void[is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void[is.na(data.wo.void$tMRL),'tResult'] == 0,
                                                                                       0, 1) 
+
+
+#for comparison we need to exclude recently added methods that don't apply to the entire dataset
+data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699','EPA 1613', 'EPA 1614A', 'EPA 1668C'),]
+dwn.sub <- data.wo.newmethods[!data.wo.newmethods$chem.group %in% c('Standard Parameters','NA','Plant or animal sterols') & !is.na(data.wo.newmethods$chem.group),]
+
+
+#list of unique detections with counts of nondetects and detects
+detect.counts <- as.data.frame.matrix(table(dwn.sub$Analyte, dwn.sub$Detect.nondetect))
+detect.counts$Analyte <- row.names(detect.counts)
+detect.counts <- rename(detect.counts, c('0' = 'Nondetect', '1' = 'Detect'))
+detect.counts <- merge(detect.counts, categories.sub, by.x = 'Analyte', by.y = 'Chemical', all.x = TRUE)
+View(arrange(detect.counts,desc(Detect)))
+
+#number of unique compounds detected per station
+by.station <- arrange(ddply(dwn.sub, .(Project,SampleRegID,SampleAlias), summarise, sum = sum(Detect.nondetect)),desc(sum))
+by.station <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.station <- rename(by.station, c('V1' = 'count'))
+by.station <- arrange(by.station, desc(count))
+ggplot(by.station, aes(x = SampleRegID, y = count)) + geom_bar(stat = 'identity')
+
+#number of unique compounds detected per chemical group per station
+by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.group <- rename(by.group, c('V1' = 'count'))
+View(arrange(by.group, SampleRegID, chem.group, desc(count)))
+by.group$chem.group <- factor(by.group$chem.group, levels = c('Combustion By-Products',                                                            
+                                                              'Consumer Product Constituents (including Pharmaceuticals & Personal Care Products)',
+                                                              'Current Use Pesticides',
+                                                              'Industrial Chemicals or Intermediates',                                             
+                                                              'Legacy Pesticides',                                                                 
+                                                              'Metals',                                                                            
+                                                              'Flame retardants'))
+by.group.detects <- by.group[by.group$count > 0,]
+by.group.detects <- arrange(by.group.detects, desc(count))
+
+#compounds detected per chemical group without the new methods
+by.group.only <- arrange(ddply(dwn.sub, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
+by.group.only <- by.group.only[!is.na(by.group.only$chem.group) & by.group.only$chem.group != 'NA',]
+
+#if you inlcude all the data we have
+by.group.only.all <- arrange(ddply(data.wo.void, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
+by.group.only.all <- by.group.only.all[!is.na(by.group.only.all$chem.group) & by.group.only.all$chem.group != 'NA',]
+
+#look for the compounds consistently detected across the state
+#123 total stations sampled in this dataset as of 2014-01-06
+detects.only <- dwn.sub[dwn.sub$Detect.nondetect == 1,]
+
+by.analyte <- ddply(detects.only, .(Analyte), function (x) {length(unique(x$SampleRegID))})
+by.analyte <- rename(by.analyte, c('V1' = 'CountofStations'))
+by.analyte <- arrange(by.analyte, desc(CountofStations))
+
+#to compare to land use we need to pull that file in
+lu <- read.xlsx('//deqlead03/gis_wa/project_working_folders/toxics/land use maps/attila_toxics_wshds.xlsx', sheetName = 'attila clip')
+data.w.lu <- merge(dwn.sub, lu, by.x = 'SampleRegID', by.y = 'NAME', all.x = TRUE)
+data.w.lu <- rename(data.w.lu, c('X.50.' = 'DomLU'))
+by.lu <- arrange(ddply(data.w.lu, .(DomLU), summarise, sum = sum(Detect.nondetect)),desc(sum))
 
 #pull out just the metals data
 metals <- data.wo.void[data.wo.void$SpecificMethod %in% c('EPA 200.8', '200.8'),]
@@ -418,7 +480,7 @@ View(data.wo.void[which(data.wo.void$exceed == 1),])
 # dbo.REPSAMPLE.Sample, dbo.REPSAMPLE.SampleAlias, dbo.REPSAMPLE.SampleRegID,
 # dbo.REPSAMPLE.SampleType, dbo.REPSAMPLE.ClientMatrix, dbo.REPSAMPLE.Sampled,
 # dbo.REPSAMPLEANALYSIS.Analysis, dbo.REPSAMPLEANALYSIS.SpecificMethod,
-# dbo.REPSAMPLEANALYTE.Analyte, dbo.REPSAMPLEANALYTE.nMRL,
+# dbo.REPSAMPLEANALYTE.Analyte, dbo.REPSAMPLEANALYTE.tMRL,
 # dbo.REPSAMPLEANALYTE.tResult, dbo.REPSAMPLEANALYTE.FinalUnits As 'Unit',
 # dbo.REPSAMPLEANALYTE.AnalyteNotes as 'AnalyteQualifiers', dbo.REPSAMPLEANALYSIS.SampleNotes as 'SampleQualifiers'
 # From dbo.REPWRK Inner Join
@@ -434,5 +496,7 @@ View(data.wo.void[which(data.wo.void$exceed == 1),])
 #                          1212009, 1212007, 1212102, 1212099,
 #                          1212101, 1212100, 1212108, 1212107,
 #                          1212083, 1212089, 1212081, 1212082,
-#                          1212002, 1212001, 1211023, 1211024, 1211026)
+#                          1212002, 1212001, 1211023, 1211024, 1211026)And
+#dbo.REPSAMPLEANALYTE.SUR = 'FALSE' And
+#dbo.REPSAMPLEANALYTE.Analyte NOT LIKE '%2C%'
 # Order By dbo.REPWRK.Wrk, dbo.REPSAMPLE.Sample, dbo.REPSAMPLEANALYTE.Analyte
