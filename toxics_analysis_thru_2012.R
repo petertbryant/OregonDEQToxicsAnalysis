@@ -266,21 +266,27 @@ data.wo.void[is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void
 #for comparison we need to exclude recently added methods that don't apply to the entire dataset
 data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699','EPA 1613', 'EPA 1614A', 'EPA 1668C'),]
 dwn.sub <- data.wo.newmethods[!data.wo.newmethods$chem.group %in% c('Standard Parameters','NA','Plant or animal sterols') & !is.na(data.wo.newmethods$chem.group),]
-
+#The writing of this table using write.xlsx is too slow and throws an error with the Java Heap Space so to get it into the same file
+#I write it to .csv first, which is fast then use the Move or Copy feature from the right click menu on the tab in Excel to place it 
+#into the Data_Summary_DRAFT.xlsx file.
+#write.csv(data.wo.newmethods, '//deqlead01/wqm/toxics_2012/data/r/Data_wo_NewMethods.csv', row.names = FALSE)
 
 #list of unique detections with counts of nondetects and detects
 detect.counts <- as.data.frame.matrix(table(dwn.sub$Analyte, dwn.sub$Detect.nondetect))
 detect.counts$Analyte <- row.names(detect.counts)
 detect.counts <- rename(detect.counts, c('0' = 'Nondetect', '1' = 'Detect'))
 detect.counts <- merge(detect.counts, categories.sub, by.x = 'Analyte', by.y = 'Chemical', all.x = TRUE)
-View(arrange(detect.counts,desc(Detect)))
+detect.counts$PercentDetection <- (detect.counts$Detect/(detect.counts$Nondetect + detect.counts$Detect))*100
+View(arrange(detect.counts,desc(PercentDetection)))
+#This creates the Data_Summary_DRAFT.xlsx file
+#write.xlsx(detect.counts,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='TotalDetects',row.names = FALSE)
 
 #number of unique compounds detected per station
 by.station <- arrange(ddply(dwn.sub, .(Project,SampleRegID,SampleAlias), summarise, sum = sum(Detect.nondetect)),desc(sum))
 by.station <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
 by.station <- rename(by.station, c('V1' = 'count'))
 by.station <- arrange(by.station, desc(count))
-ggplot(by.station, aes(x = SampleRegID, y = count)) + geom_bar(stat = 'identity')
+#write.xlsx(by.station,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByStation',row.names = FALSE,append = TRUE)
 
 #number of unique compounds detected per chemical group per station
 by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
