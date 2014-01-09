@@ -82,6 +82,9 @@ data.2012.w.qualifiers$Status <- ifelse(data.2012.w.qualifiers$tResult %in% c('V
 #this simplifies the qualifier and status columns and writes it back to the dataframe name that is used from here on
 data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
 
+#There is a site in the Deschutes basin that was sampled during a John Day basin sampling event and was associated with
+#the John Day Project. This puts it in the right Project for consistency.
+data.2012[data.2012$SampleRegID == 10411,'Project'] <- 'Deschutes'
 
 
 #this 2012 data is preliminary so it's possible some of the column names
@@ -208,6 +211,10 @@ lasar$Analyte <- revalue(lasar$Analyte, lasar.change.vector)
 #this puts the LASAR and Element data together
 data <- rbind(data.2012, lasar, willy.metals.melted)
 
+#There are several stations that have double spaces in their names and several stations that double spaces for some records
+#and not others. This removes those double spaces for consistent naming.
+data$SampleAlias <- gsub("  "," ",data$SampleAlias)
+
 #This pulls out empty rows
 data <- data[!is.na(data$SampleRegID),]
 
@@ -291,20 +298,13 @@ by.station <- arrange(by.station, desc(count))
 #number of unique compounds detected per chemical group per station
 by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
 by.group <- rename(by.group, c('V1' = 'count'))
-View(arrange(by.group, SampleRegID, chem.group, desc(count)))
-by.group$chem.group <- factor(by.group$chem.group, levels = c('Combustion By-Products',                                                            
-                                                              'Consumer Product Constituents (including Pharmaceuticals & Personal Care Products)',
-                                                              'Current Use Pesticides',
-                                                              'Industrial Chemicals or Intermediates',                                             
-                                                              'Legacy Pesticides',                                                                 
-                                                              'Metals',                                                                            
-                                                              'Flame retardants'))
-by.group.detects <- by.group[by.group$count > 0,]
-by.group.detects <- arrange(by.group.detects, desc(count))
+by.group <- arrange(by.group, SampleRegID, chem.group, desc(count))
+#write.xlsx(by.group,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroupByStation',row.names = FALSE,append = TRUE)
 
 #compounds detected per chemical group without the new methods
 by.group.only <- arrange(ddply(dwn.sub, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
 by.group.only <- by.group.only[!is.na(by.group.only$chem.group) & by.group.only$chem.group != 'NA',]
+#write.xlsx(by.group.only,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroup',row.names = FALSE,append = TRUE)
 
 #if you inlcude all the data we have
 by.group.only.all <- arrange(ddply(data.wo.void, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
