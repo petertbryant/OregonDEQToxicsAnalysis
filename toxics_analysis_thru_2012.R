@@ -273,10 +273,30 @@ data.wo.void[is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void
 #for comparison we need to exclude recently added methods that don't apply to the entire dataset
 data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699','EPA 1613', 'EPA 1614A', 'EPA 1668C'),]
 dwn.sub <- data.wo.newmethods[!data.wo.newmethods$chem.group %in% c('Standard Parameters','NA','Plant or animal sterols') & !is.na(data.wo.newmethods$chem.group),]
+
+#to compare to land use we need to pull that file in
+lu <- read.xlsx('//deqlead03/gis_wa/project_working_folders/toxics/land use maps/attila_toxics_wshds.xlsx', sheetName = 'attila clip')
+data.w.lu <- merge(data.wo.newmethods, lu, by.x = 'SampleRegID', by.y = 'NAME', all.x = TRUE)
+data.w.lu <- rename(data.w.lu, c('X.50.' = 'DomLU'))
+
+#there are stations that we colelcted metals data at that didn't get included in Kara's initial Land Use analysis
+#here we will take them out for now
+data.w.lu <- data.w.lu[!is.na(data.w.lu$DomLU),]
+
+#I think the raw data file I output for everyone to see should have the land use in it so I will output at this point
 #The writing of this table using write.xlsx is too slow and throws an error with the Java Heap Space so to get it into the same file
 #I write it to .csv first, which is fast then use the Move or Copy feature from the right click menu on the tab in Excel to place it 
 #into the Data_Summary_DRAFT.xlsx file.
-#write.csv(data.wo.newmethods, '//deqlead01/wqm/toxics_2012/data/r/Data_wo_NewMethods.csv', row.names = FALSE)
+#write.csv(data.w.lu, '//deqlead01/wqm/toxics_2012/data/r/Data_wo_NewMethods.csv', row.names = FALSE)
+
+#let's look at chemical group by landuse
+by.lu <- ddply(data.w.lu, .(DomLU,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.lu <- rename(by.lu, c('V1' = 'count'))
+by.lu <- arrange(by.lu, DomLU, chem.group, desc(count))
+by.lu <- arrange(dcast(by.lu, DomLU ~ chem.group),DomLU)
+
+#by.lu <- arrange(ddply(data.w.lu, .(DomLU), summarise, sum = sum(Detect.nondetect)),desc(sum))
+
 
 #list of unique detections with counts of nondetects and detects
 detect.counts <- as.data.frame.matrix(table(dwn.sub$Analyte, dwn.sub$Detect.nondetect))
@@ -299,6 +319,25 @@ by.station <- arrange(by.station, desc(count))
 by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
 by.group <- rename(by.group, c('V1' = 'count'))
 by.group <- arrange(by.group, SampleRegID, chem.group, desc(count))
+by.group <- arrange(dcast(by.group, Project + SampleRegID + SampleAlias ~ chem.group),Project,SampleRegID)
+
+for (i in 1:length(unique(by.group$SampleRegID))) {
+    by.group[by.group$SampleRegID == unique(by.group$SampleRegID)[i],'TotalCount'] <- sum(by.group[by.group$SampleRegID == unique(by.group$SampleRegID)[i],'count'])
+}
+
+for (i in 1:length(unique(by.group$Project))) {
+  by.group.sub <- by.group[by.group$Project == unique(by.group$Project)[i],]
+  TitleText <- unique(by.group$Project)[i]
+  ggplot(by.group.sub, 
+               aes(x = reorder(SampleRegID,desc(TotalCount)), 
+                   y = count, 
+                   fill = chem.group)) + 
+        geom_bar(stat = 'identity') + 
+        theme(axis.text.x = element_text(angle = 90)) + 
+        ggtitle(TitleText)
+  ggsave(paste(TitleText, '-UniqueDetectsbyStation.pdf', sep = ''))
+}
+
 #write.xlsx(by.group,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroupByStation',row.names = FALSE,append = TRUE)
 
 #compounds detected per chemical group without the new methods
@@ -307,22 +346,16 @@ by.group.only <- by.group.only[!is.na(by.group.only$chem.group) & by.group.only$
 #write.xlsx(by.group.only,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroup',row.names = FALSE,append = TRUE)
 
 #if you inlcude all the data we have
-by.group.only.all <- arrange(ddply(data.wo.void, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
-by.group.only.all <- by.group.only.all[!is.na(by.group.only.all$chem.group) & by.group.only.all$chem.group != 'NA',]
+#by.group.only.all <- arrange(ddply(data.wo.void, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
+#by.group.only.all <- by.group.only.all[!is.na(by.group.only.all$chem.group) & by.group.only.all$chem.group != 'NA',]
 
 #look for the compounds consistently detected across the state
 #123 total stations sampled in this dataset as of 2014-01-06
-detects.only <- dwn.sub[dwn.sub$Detect.nondetect == 1,]
+#detects.only <- dwn.sub[dwn.sub$Detect.nondetect == 1,]
 
-by.analyte <- ddply(detects.only, .(Analyte), function (x) {length(unique(x$SampleRegID))})
-by.analyte <- rename(by.analyte, c('V1' = 'CountofStations'))
-by.analyte <- arrange(by.analyte, desc(CountofStations))
-
-#to compare to land use we need to pull that file in
-lu <- read.xlsx('//deqlead03/gis_wa/project_working_folders/toxics/land use maps/attila_toxics_wshds.xlsx', sheetName = 'attila clip')
-data.w.lu <- merge(dwn.sub, lu, by.x = 'SampleRegID', by.y = 'NAME', all.x = TRUE)
-data.w.lu <- rename(data.w.lu, c('X.50.' = 'DomLU'))
-by.lu <- arrange(ddply(data.w.lu, .(DomLU), summarise, sum = sum(Detect.nondetect)),desc(sum))
+#by.analyte <- ddply(detects.only, .(Analyte), function (x) {length(unique(x$SampleRegID))})
+#by.analyte <- rename(by.analyte, c('V1' = 'CountofStations'))
+#by.analyte <- arrange(by.analyte, desc(CountofStations))
 
 #pull out just the metals data
 metals <- data.wo.void[data.wo.void$SpecificMethod %in% c('EPA 200.8', '200.8'),]
