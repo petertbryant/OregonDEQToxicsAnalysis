@@ -272,7 +272,6 @@ data.wo.void[is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void
 
 #for comparison we need to exclude recently added methods that don't apply to the entire dataset
 data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699','EPA 1613', 'EPA 1614A', 'EPA 1668C'),]
-dwn.sub <- data.wo.newmethods[!data.wo.newmethods$chem.group %in% c('Standard Parameters','NA','Plant or animal sterols') & !is.na(data.wo.newmethods$chem.group),]
 
 #to compare to land use we need to pull that file in
 lu <- read.xlsx('//deqlead03/gis_wa/project_working_folders/toxics/land use maps/attila_toxics_wshds.xlsx', sheetName = 'attila clip')
@@ -289,14 +288,15 @@ data.w.lu <- data.w.lu[!is.na(data.w.lu$DomLU),]
 #into the Data_Summary_DRAFT.xlsx file.
 #write.csv(data.w.lu, '//deqlead01/wqm/toxics_2012/data/r/Data_wo_NewMethods.csv', row.names = FALSE)
 
+#we also don't really want to include standard parameters here
+dwn.sub <- data.w.lu[!data.w.lu$chem.group %in% c('Metals','Standard Parameters','NA','Plant or animal sterols') & !is.na(data.w.lu$chem.group),]
+
 #let's look at chemical group by landuse
-by.lu <- ddply(data.w.lu, .(DomLU,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.lu <- ddply(dwn.sub, .(DomLU,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
 by.lu <- rename(by.lu, c('V1' = 'count'))
 by.lu <- arrange(by.lu, DomLU, chem.group, desc(count))
 by.lu <- arrange(dcast(by.lu, DomLU ~ chem.group),DomLU)
-
-#by.lu <- arrange(ddply(data.w.lu, .(DomLU), summarise, sum = sum(Detect.nondetect)),desc(sum))
-
+#write.xlsx(by.lu,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroupByLU',row.names = FALSE,append = TRUE)
 
 #list of unique detections with counts of nondetects and detects
 detect.counts <- as.data.frame.matrix(table(dwn.sub$Analyte, dwn.sub$Detect.nondetect))
@@ -309,22 +309,20 @@ View(arrange(detect.counts,desc(PercentDetection)))
 #write.xlsx(detect.counts,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='TotalDetects',row.names = FALSE)
 
 #number of unique compounds detected per station
-by.station <- arrange(ddply(dwn.sub, .(Project,SampleRegID,SampleAlias), summarise, sum = sum(Detect.nondetect)),desc(sum))
-by.station <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
-by.station <- rename(by.station, c('V1' = 'count'))
-by.station <- arrange(by.station, desc(count))
-#write.xlsx(by.station,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByStation',row.names = FALSE,append = TRUE)
+by.station <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,DomLU), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.station <- rename(by.station, c('V1' = 'CountOfDetections'))
+by.station <- arrange(by.station, desc(CountOfDetections))
+#write.xlsx(by.station,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='CountOfUniqueCompoundsByStation',row.names = FALSE,append = TRUE)
 
 #number of unique compounds detected per chemical group per station
-by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group,DomLU), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
 by.group <- rename(by.group, c('V1' = 'count'))
-by.group <- arrange(by.group, SampleRegID, chem.group, desc(count))
-by.group <- arrange(dcast(by.group, Project + SampleRegID + SampleAlias ~ chem.group),Project,SampleRegID)
-
 for (i in 1:length(unique(by.group$SampleRegID))) {
-    by.group[by.group$SampleRegID == unique(by.group$SampleRegID)[i],'TotalCount'] <- sum(by.group[by.group$SampleRegID == unique(by.group$SampleRegID)[i],'count'])
+  by.group[by.group$SampleRegID == unique(by.group$SampleRegID)[i],'TotalCount'] <- sum(by.group[by.group$SampleRegID == unique(by.group$SampleRegID)[i],'count'])
 }
+by.group <- arrange(by.group, SampleRegID, chem.group, desc(count))
 
+#Some test graphs
 for (i in 1:length(unique(by.group$Project))) {
   by.group.sub <- by.group[by.group$Project == unique(by.group$Project)[i],]
   TitleText <- unique(by.group$Project)[i]
@@ -338,11 +336,33 @@ for (i in 1:length(unique(by.group$Project))) {
   ggsave(paste(TitleText, '-UniqueDetectsbyStation.pdf', sep = ''))
 }
 
+by.group <- arrange(dcast(by.group, Project + SampleRegID + SampleAlias + DomLU + TotalCount ~ chem.group, value.var = 'count'),Project,SampleRegID)
+
+
 #write.xlsx(by.group,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroupByStation',row.names = FALSE,append = TRUE)
 
-#compounds detected per chemical group without the new methods
-by.group.only <- arrange(ddply(dwn.sub, .(chem.group), summarise, sum = sum(Detect.nondetect)),desc(sum))
-by.group.only <- by.group.only[!is.na(by.group.only$chem.group) & by.group.only$chem.group != 'NA',]
+#detections per chemical group without the new methods. median and min are calculated on detections only.
+by.group.only <- ddply(dwn.sub, .(chem.group), summarise, detect = sum(Detect.nondetect), 
+                                                                  nondetect = length(Detect.nondetect) - sum(Detect.nondetect),
+                                                                  detection.frequency = (sum(Detect.nondetect)/length(Detect.nondetect))*100,
+                                                                  max.conc = max(tResult))
+by.group.median <- ddply(dwn.sub, .(chem.group), function(x) {ifelse(all(is.na(x[x$Detect.nondetect > 0,'tResult'])),
+                                                                                                     0,
+                                                                                                     median(x[x$Detect.nondetect > 0,'tResult']))})
+by.group.min <- ddply(dwn.sub, .(chem.group), function(x) {ifelse(all(is.na(x[x$Detect.nondetect > 0,'tResult'])),
+                                                                     'ND',
+                                                                     min(x[x$Detect.nondetect > 0,'tResult']))})
+by.group.unique <- ddply(dwn.sub, .(chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
+by.group.total <- ddply(dwn.sub, .(chem.group), function(x) {length(unique(x$Analyte))})
+by.group.median <- rename(by.group.median, c('V1' = 'meidan.conc'))
+by.group.min <- rename(by.group.min, c('V1' = 'min.conc'))
+by.group.unique <- rename(by.group.unique, c('V1' = 'CountOfUniqueCompoundsDetected'))
+by.group.total <- rename(by.group.total, c('V1' = 'CountOfCompoundsAnalyzed'))
+by.group.only <- merge(by.group.only, by.group.median, by = 'chem.group')
+by.group.only <- merge(by.group.only, by.group.min, by = 'chem.group')
+by.group.only <- merge(by.group.only, by.group.unique, by = 'chem.group')
+by.group.only <- merge(by.group.only, by.group.total, by = 'chem.group')
+by.group.only$CompoundDetectionFrequency <- by.group.only$CountOfUniqueCompoundsDetected/by.group.only$CountOfCompoundsAnalyzed*100
 #write.xlsx(by.group.only,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroup',row.names = FALSE,append = TRUE)
 
 #if you inlcude all the data we have
@@ -416,18 +436,16 @@ metals.w.criteria.hm$Table40Water.Organism.Magnitude <- metals.w.criteria.hm$tRe
 metals.w.criteria.hm$Table40OrganismOnly.Exceed <- ifelse(metals.w.criteria.hm$tResult > suppressWarnings(as.numeric(metals.w.criteria.hm$Table40OrganismOnly)), 1, 0)
 metals.w.criteria.hm$Table40OrganismOnly.Magnitude <- metals.w.criteria.hm$tResult/suppressWarnings(as.numeric(metals.w.criteria.hm$Table40OrganismOnly))
 
-metals.w.criteria.hm.sub <- metals.w.criteria.hm[,c('Project','SampleRegID','SampleAlias','Sampled','Name.alone','PARAMETER_MODIFIER_ABBREVIATION','Analyte','tResult','Units',
+metals.w.criteria.hm.sub <- metals.w.criteria.hm[,c('Project','SampleRegID','SampleAlias','Sampled','Analyte','tResult','Unit',
                          'tResulthardness','tMRL','Detect.nondetect','Table30Acute','Table30Acute.Exceed','Table30Acute.Magnitude',
                          'Table30Chronic','Table30Chronic.Exceed','Table30Chronic.Magnitude','Table40Water.Organism','Table40Water.Organism.Exceed',
                          'Table40Water.Organism.Magnitude','Table40OrganismOnly','Table40OrganismOnly.Exceed','Table40OrganismOnly.Magnitude')]
 
-intermediate <- melt(metals.w.criteria.hm, id.vars = c('ID','Project','SampleRegID','SampleAlias','Sampled','Name.alone',
-                                                   'PARAMETER_MODIFIER_ABBREVIATION','Analyte','tResult','Units','tResulthardness','tMRL',
+intermediate <- melt(metals.w.criteria.hm, id.vars = c('ID','Project','SampleRegID','SampleAlias','Sampled','Analyte','tResult','Unit','tResulthardness','tMRL',
                                                    'Detect.nondetect'), 
              measure.vars = c('Table30Acute.Exceed','Table30Chronic.Exceed','Table40Water.Organism.Exceed','Table40OrganismOnly.Exceed'))
 
-roll.up <- ddply(metals.w.criteria.hm.sub, .(Project,SampleRegID,SampleAlias,Name.alone,
-                                 PARAMETER_MODIFIER_ABBREVIATION,Analyte), summarise, 
+roll.up <- ddply(metals.w.criteria.hm.sub, .(Project,SampleRegID,SampleAlias,Analyte), summarise, 
                  Table30Acute.Exceed = sum(Table30Acute.Exceed), 
                  Table30Chronic.Exceed = sum(Table30Chronic.Exceed), 
                  Table40Water.Organism.Exceed = sum(Table40Water.Organism.Exceed),
@@ -439,11 +457,11 @@ roll.up$percent.detect <- round(100*(roll.up$detect.count/roll.up$sample.count))
 #metals.exceed.summary <- (dcast(intermediate, formula = Project + SampleRegID + SampleAlias + Analyte ~ variable, fun.aggregate = sum) )
 #metals.exceed.summary.n <- (dcast(intermediate, formula = Project + SampleRegID + SampleAlias + Analyte ~ variable, fun.aggregate = length) )
 gc()
-write.xlsx2(metals.w.criteria.hm.sub, '//deqlead01/wqm/toxics_2012/data/analysis_through_2012/MetalsAnalysisThrough2012_10252013.xlsx',
-           sheetName='Data')
+#write.xlsx2(metals.w.criteria.hm.sub, '//deqlead01/wqm/toxics_2012/data/analysis_through_2012/MetalsAnalysisThrough2012_10252013.xlsx',
+#           sheetName='Data')
 gc()
-write.xlsx2(roll.up, '//deqlead01/wqm/toxics_2012/data/analysis_through_2012/MetalsAnalysisThrough2012_10252013.xlsx',
-           sheetName='ExceedanceSummary',append = TRUE)
+#write.xlsx2(roll.up, '//deqlead01/wqm/toxics_2012/data/analysis_through_2012/MetalsAnalysisThrough2012_10252013.xlsx',
+#           sheetName='ExceedanceSummary',append = TRUE)
 
 
 #View(arrange(hm.evaluated[,c('Project' ,'Sampled', 'SampleRegID', 'SampleAlias','Analyte', 'Name.full', 'tResultmetal', 'tResulthardness','crit.acute', 'crit.chronic', 'exceed.acute', 'exceed.chronic')], Project))
@@ -481,8 +499,8 @@ data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
 data.wo.void <- merge(data.wo.void, min.criteria.values, by.x = 'Analyte', by.y = 'Pollutant', all.x = TRUE)
 
 #need to do unit conversion/mapping
-data.wo.void[data.wo.void$Units == 'ng/L','tResult2'] <- data.wo.void[data.wo.void$Units == 'ng/L','tResult'] * 1000
-data.wo.void[data.wo.void$Units == 'ng/L','Units'] <-  "µg/L"
+data.wo.void[data.wo.void$Unit == 'ng/L','tResult2'] <- data.wo.void[data.wo.void$Unit == 'ng/L','tResult'] * 1000
+data.wo.void[data.wo.void$Unit == 'ng/L','Units'] <-  "µg/L"
 
 #marks records that exceed the criteria or benchmark
 data.wo.void$exceed <- ifelse(data.wo.void$tResult >= data.wo.void$value, 1, 0)
