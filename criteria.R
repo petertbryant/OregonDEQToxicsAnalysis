@@ -30,6 +30,7 @@ criteria.values.melted$value <- suppressWarnings(as.numeric(criteria.values.melt
 criteria.values.melted.applicable <- criteria.values.melted[!is.na(criteria.values.melted$value),]
 
 min.criteria.values <- ddply(criteria.values.melted, .(Pollutant), function(m) {
+  m <- m[m$value != 0,]
   if (all(is.na(m[m$variable %in% c('Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism', 
                                     'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only', 
                                     'Table 20 Toxic Substances - Freshwater Acute', 
