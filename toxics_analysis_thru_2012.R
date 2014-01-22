@@ -218,6 +218,9 @@ data$SampleAlias <- gsub("  "," ",data$SampleAlias)
 #This pulls out empty rows
 data <- data[!is.na(data$SampleRegID),]
 
+#We also only want to include A and B data
+data <- data[data$Status %in% c('A','A+','B'),]
+
 #we also want to add in the Focus List Categories
 categories <- read.xlsx2('//deqlead01/wqm/toxics_2012/data/Focus list and 737 categories.xlsx', sheetName = 'Sheet1')
 #inside.file <- read.xlsx2('//deqlead01/wqm/toxics_2012/data/2011 Access export & basin summaries 4DecKG.xlsx', sheetName = '737 & Focus List categories')
@@ -288,7 +291,8 @@ data.w.lu <- data.w.lu[!is.na(data.w.lu$DomLU),]
 #into the Data_Summary_DRAFT.xlsx file.
 #write.csv(data.w.lu, '//deqlead01/wqm/toxics_2012/data/r/Data_wo_NewMethods.csv', row.names = FALSE)
 
-#we also don't really want to include standard parameters here
+#we also don't really want to include standard parameters here, plant or animal sterols and metals without criteria
+#The chemicals that don't match to a category
 dwn.sub <- data.w.lu[!data.w.lu$chem.group %in% c('Metals','Standard Parameters','NA','Plant or animal sterols') & !is.na(data.w.lu$chem.group),]
 
 #let's look at chemical group by landuse
@@ -489,27 +493,30 @@ name.match <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Criteria_benchmarks_etc
 
 name.match.sub <- name.match[!is.na(name.match$criteria_name),]
 
-data.wo.void$Analyte <- as.factor(data.wo.void$Analyte)
+data.wo.newmethods$Analyte <- as.factor(data.wo.newmethods$Analyte)
 
-data.wo.void$Analyte <- mapvalues(data.wo.void$Analyte, from = name.match.sub$name_in_data, to = name.match.sub$criteria_name)
+data.wo.newmethods$Analyte <- mapvalues(data.wo.newmethods$Analyte, from = name.match.sub$name_in_data, to = name.match.sub$criteria_name)
 
-data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
+data.wo.newmethods$Analyte <- as.character(data.wo.newmethods$Analyte)
 
 #brings in the criteria
-data.wo.void <- merge(data.wo.void, min.criteria.values, by.x = 'Analyte', by.y = 'Pollutant', all.x = TRUE)
+data.wo.newmethods <- merge(data.wo.newmethods, min.criteria.values, by.x = 'Analyte', by.y = 'Pollutant', all.x = TRUE)
 
 #need to do unit conversion/mapping
-data.wo.void[data.wo.void$Unit == 'ng/L','tResult2'] <- data.wo.void[data.wo.void$Unit == 'ng/L','tResult'] * 1000
-data.wo.void[data.wo.void$Unit == 'ng/L','Units'] <-  "µg/L"
+data.wo.newmethods[data.wo.newmethods$Unit == 'ng/L','tResult'] <- data.wo.newmethods[data.wo.newmethods$Unit == 'ng/L','tResult'] / 1000
+data.wo.newmethods[data.wo.newmethods$Unit == 'ng/L','Unit'] <-  "µg/L"
+
+data.wo.newmethods[data.wo.newmethods$Unit == 'mg/L','tResult'] <- data.wo.newmethods[data.wo.newmethods$Unit == 'mg/L','tResult'] * 1000
+data.wo.newmethods[data.wo.newmethods$Unit == 'mg/L','Unit'] <-  "µg/L"
 
 #marks records that exceed the criteria or benchmark
-data.wo.void$exceed <- ifelse(data.wo.void$tResult >= data.wo.void$value, 1, 0)
+data.wo.newmethods$exceed <- ifelse(data.wo.newmethods$tResult >= data.wo.newmethods$value, 1, 0)
 
 #magnitude
-data.wo.void$magnitude <- data.wo.void$tResult/data.wo.void$value
+data.wo.newmethods$magnitude <- data.wo.newmethods$tResult/data.wo.newmethods$value
 
 #makes the ID column to be used in the hardness evaluation
-data.wo.void$ID <- paste(data.wo.void$SampleRegID, data.wo.void$Sampled)
+data.wo.newmethods$ID <- paste(data.wo.newmethods$SampleRegID, data.wo.newmethods$Sampled)
 
 
 
