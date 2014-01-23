@@ -28,6 +28,7 @@ criteria.values.melted <- melt(criteria.values, id.vars = 'Pollutant')
 criteria.values.melted$value <- suppressWarnings(as.numeric(criteria.values.melted$value))
 
 criteria.values.melted.applicable <- criteria.values.melted[!is.na(criteria.values.melted$value),]
+criteria.values.melted.applicable <- criteria.values.melted.applicable[criteria.values.melted.applicable$value != 0,]
 
 min.criteria.values <- ddply(criteria.values.melted, .(Pollutant), function(m) {
   m <- m[m$value != 0,]

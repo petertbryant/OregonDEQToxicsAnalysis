@@ -493,30 +493,37 @@ name.match <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Criteria_benchmarks_etc
 
 name.match.sub <- name.match[!is.na(name.match$criteria_name),]
 
-data.wo.newmethods$Analyte <- as.factor(data.wo.newmethods$Analyte)
+data.wo.void$Analyte <- as.factor(data.wo.void$Analyte)
 
-data.wo.newmethods$Analyte <- mapvalues(data.wo.newmethods$Analyte, from = name.match.sub$name_in_data, to = name.match.sub$criteria_name)
+data.wo.void$Analyte <- mapvalues(data.wo.void$Analyte, from = name.match.sub$name_in_data, to = name.match.sub$criteria_name)
 
-data.wo.newmethods$Analyte <- as.character(data.wo.newmethods$Analyte)
+data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
 
 #brings in the criteria
-data.wo.newmethods <- merge(data.wo.newmethods, min.criteria.values, by.x = 'Analyte', by.y = 'Pollutant', all.x = TRUE)
+data.wo.void <- merge(data.wo.void, min.criteria.values, by.x = 'Analyte', by.y = 'Pollutant', all.x = TRUE)
+
+criteria.for.analytes.we.have <- criteria.values.melted.applicable[criteria.values.melted.applicable$Pollutant %in% data.wo.void$Analyte,]
+data.wo.void.w.criteria <- merge(data.wo.void, criteria.for.analytes.we.have, by.x = 'Analyte', by.y = 'Pollutant', all = TRUE)
 
 #need to do unit conversion/mapping
-data.wo.newmethods[data.wo.newmethods$Unit == 'ng/L','tResult'] <- data.wo.newmethods[data.wo.newmethods$Unit == 'ng/L','tResult'] / 1000
-data.wo.newmethods[data.wo.newmethods$Unit == 'ng/L','Unit'] <-  "µg/L"
+data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','tResult'] <- data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','tResult'] / 1000
+data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','Unit'] <-  "µg/L"
 
-data.wo.newmethods[data.wo.newmethods$Unit == 'mg/L','tResult'] <- data.wo.newmethods[data.wo.newmethods$Unit == 'mg/L','tResult'] * 1000
-data.wo.newmethods[data.wo.newmethods$Unit == 'mg/L','Unit'] <-  "µg/L"
+data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'mg/L','tResult'] <- data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'mg/L','tResult'] * 1000
+data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'mg/L','Unit'] <-  "µg/L"
 
 #marks records that exceed the criteria or benchmark
-data.wo.newmethods$exceed <- ifelse(data.wo.newmethods$tResult >= data.wo.newmethods$value, 1, 0)
+data.wo.void.w.criteria$exceed <- ifelse(data.wo.void.w.criteria$tResult >= data.wo.void.w.criteria$value, 1, 0)
 
 #magnitude
-data.wo.newmethods$magnitude <- data.wo.newmethods$tResult/data.wo.newmethods$value
+data.wo.void.w.criteria$magnitude <- data.wo.void.w.criteria$tResult/data.wo.void.w.criteria$value
+
+#make it look pretty for excel
+View(dcast(data.wo.void.w.criteria, Project + SampleRegID + SampleAlias + Sampled + SampleType + Analyte + 
+             tResult + tMRL + Unit + SpecificMethod + Status + chem.group + Detect.nondetect ~ variable))
 
 #makes the ID column to be used in the hardness evaluation
-data.wo.newmethods$ID <- paste(data.wo.newmethods$SampleRegID, data.wo.newmethods$Sampled)
+data.wo.void.w.criteria$ID <- paste(data.wo.void.w.criteria$SampleRegID, data.wo.void.w.criteria$Sampled)
 
 
 
