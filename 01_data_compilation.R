@@ -1,0 +1,302 @@
+#This file pulls together three files. One with data from Element. One with toxics data from LASAR and the last with metals data in the 
+#Willamette basin only. The intention is that this file will always be run first and the R session and workspace from this file will be
+#used to feed into the subsequent uses of the data.wo.void composite data frame. The reason for this is to prevent the need to output a file and 
+#import it again for the next script to run.
+
+library(plyr)
+library(stringr)
+library(reshape2)
+library(xlsx)
+library(ggplot2)
+
+options('scipen' = 50, stringsAsFactors = FALSE)
+
+#Pull in the Element data that is final as of 1/3/2014. This data was queried using the SQL Query tool in Element. The text of that query
+#is commented at the end of this file for future reference.
+data.2012 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
+
+#The qualifiers from this query were concatenated into a single field which is kind of a pain to parse so in order to get Status
+#I queried the qualifier table directly and will make a status column that can then be merged with the data table.
+data.2012.qualifiers <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Qualifier_Query_for_TMP_on_01032014.csv', stringsAsFactors = FALSE)
+
+data.2012.qualifiers$id <- paste(data.2012.qualifiers$Wrk, data.2012.qualifiers$Sample, data.2012.qualifiers$Analysis, data.2012.qualifiers$Analyte)
+
+data.2012.qualifiers$Status <- substr(data.2012.qualifiers$Qualifier, nchar(data.2012.qualifiers$Qualifier),nchar(data.2012.qualifiers$Qualifier))
+
+data.2012.qualifiers$Status <- as.factor(data.2012.qualifiers$Status)
+
+data.2012.qualifiers$Status <- revalue(data.2012.qualifiers$Status, c('a' = 1, 'A' = 1, 'b' = 2, 'B' = 2, 'c' = 3, 'C' = 3, 'D' = 4, 'Q' = 1))
+
+data.2012.qualifiers$Status <- as.numeric(data.2012.qualifiers$Status)
+
+processed <- ddply(data.2012.qualifiers, .(id), summarise, Status = max(Status))
+
+processed$Status <- as.factor(processed$Status)
+
+processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D'))
+
+processed$AnalyteStatus <- as.character(processed$Status)
+
+processed <- processed[,c('id','AnalyteStatus')]
+
+#now that the qualifiers have been parsed and the DQL determined we can associate them with the data itself
+data.2012$id <- paste(data.2012$Wrk, data.2012$Sample, data.2012$Analysis, data.2012$Analyte)
+data.2012.w.qualifiers <- merge(data.2012, processed, by = 'id', all.x = TRUE)
+
+#the above only captures the analyte level qualifiers. the below will also capture the sample level qualifiers
+sample.qualifiers <- data.2012.qualifiers[data.2012.qualifiers$Analyte == '',]
+
+sample.qualifiers$sid <- paste(sample.qualifiers$Wrk, sample.qualifiers$Sample, sample.qualifiers$Analysis)
+
+sample.qualifiers$Status <- substr(sample.qualifiers$Qualifier, nchar(sample.qualifiers$Qualifier),nchar(sample.qualifiers$Qualifier))
+
+sample.qualifiers$Status <- as.factor(sample.qualifiers$Status)
+
+sample.qualifiers$Status <- revalue(sample.qualifiers$Status, c('a' = 1, 'A' = 1, 'B' = 2, 'D' = 4, 'Q' = 1))
+
+sample.qualifiers$Status <- as.numeric(sample.qualifiers$Status)
+
+processed <- ddply(sample.qualifiers, .(sid), summarise, Status = max(Status))
+
+processed$Status <- as.factor(processed$Status)
+
+processed$Status <- revalue(processed$Status, c('1' = 'A', '2' = 'B', '3' = 'C', '4' = 'D'))
+
+processed$SampleStatus <- as.character(processed$Status)
+
+processed <- processed[,c('sid','SampleStatus')]
+
+data.2012.w.qualifiers$sid <- paste(data.2012.w.qualifiers$Wrk, data.2012.w.qualifiers$Sample, data.2012.w.qualifiers$Analysis)
+data.2012.w.qualifiers <- merge(data.2012.w.qualifiers, processed, by = 'sid', all.x = TRUE)
+
+#This brings the status into a single column
+data.2012.w.qualifiers$Status <- ifelse(is.na(data.2012.w.qualifiers$AnalyteStatus),
+                                        ifelse(is.na(data.2012.w.qualifiers$SampleStatus),
+                                               'A',
+                                               data.2012.w.qualifiers$SampleStatus),
+                                        data.2012.w.qualifiers$AnalyteStatus)
+
+#i want to check on whether all voided samples should be DQL 'D'. if so, add the code to do that here
+data.2012.w.qualifiers$Status <- ifelse(data.2012.w.qualifiers$tResult %in% c('Void', 'Cancelled'),
+                                        'D',
+                                        data.2012.w.qualifiers$Status)
+
+#this simplifies the qualifier and status columns and writes it back to the dataframe name that is used from here on
+data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
+
+#There is a site in the Deschutes basin that was sampled during a John Day basin sampling event and was associated with
+#the John Day Project. This puts it in the right Project for consistency.
+data.2012[data.2012$SampleRegID == 10411,'Project'] <- 'Deschutes'
+
+
+#this 2012 data is preliminary so it's possible some of the column names
+#will change the next time we get the data
+# files.2012 <- list.files('//deqlead01/wqm/toxics_2012/data/2012 data/raw data/')
+# 
+# for (i in 1:length(files.2012)){
+#   file.path <- paste('//deqlead01/wqm/toxics_2012/data/2012 data/raw data/', files.2012[i], sep = '')
+#   tmp <- read.xlsx2(file.path, sheetName = 'Data')
+#   ifelse(i == 1, ref <- names(tmp), tmp <- tmp[,ref])
+#   print(names(tmp))
+#   ifelse(i == 1, 
+#          data.2012 <- tmp,
+#          data.2012 <- rbind(data.2012, tmp))
+# }
+# 
+# data.2012 <- data.2012[data.2012$Analyte != '',]
+# 
+# data.2012[data.2012$Analyte == 'Inorganic Arsenic, Total','Analyte'] <- 'Arsenic, Total inorganic'
+
+#for this analysis we can leave out blanks and field duplicates (we may want to check the duplicates later and use a detect
+#when we don't have a primary detection)
+data.2012 <- data.2012[!data.2012$SampleType %in% c('Blank - Equipment::EB', 'Blank - Transfer::TfB', 'Field Duplicate::FD'),]
+
+#this process was initially developed with LASAR data so I will change the element names to lasar names for now
+# i want to go the other way eventually but just want to see some results right now
+data.2012 <- data.2012[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'SampleType','Analyte','tResult', 'tMRL', 'Unit', 'SpecificMethod', 'Status')]
+#data.2012 <- rename(data.2012, c('Project' = 'SUBPROJECT_NAME', 'SampleRegID' = 'STATION', 'SampleAlias' = 'DESCRIPTION','Sampled' = 'SAMPLE_DATE', 'Analyte' = 'NAME',
+#                                 'tResult' = 'PRV', 'tMRL' = 'METHOD_REPORTING_LIMIT', 'Units' = 'UNIT', 'SpecificMethod' = 'METHOD_CODE'))
+
+#both of these data sets are from the LASAR database and have different column names
+data.2011 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/2011allBasins.csv', stringsAsFactors = FALSE)
+willy.data <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Willamette water data.csv', stringsAsFactors = FALSE)
+
+willy.metals <- read.xlsx2('//deqlead01/wqm/TOXICS_2012/Data/willamette metals_KG.xlsx', sheetName = 'Sheet2')
+willy.metals <- rename(willy.metals, c("Sampling.Event.Number" = 'SAMPLING_EVENT_KEY', "Station.Identifier" = 'SampleRegID', 
+                                       "Station.Description" = 'SampleAlias', "Sample.Date.Time" = 'Sampled',
+                                       "QA.QC.Type" = 'QA_QC_TYPE', 
+                                       "Field.Conductivity...µmhos.cm...25..C." = 'Conductivity',
+                                       "Field.pH...SU." = 'pH', 
+                                       "Field.Turbidity...NTU." = 'Turbidity', 
+                                       "TR.Antimony.Result" = 'Antimony, Total recoverable', 
+                                       "Total.Recoverable.Arsenic...µg.L." = 'Arsenic, Total recoverable',
+                                       "Total.Recoverable.Barium...µg.L." = 'Barium, Total recoverable',
+                                       "Total.Recoverable.Beryllium...µg.L." = 'Beryllium, Total recoverable',
+                                       "Total.Recoverable.Cadmium...µg.L." = 'Cadmium, Total recoverable',
+                                       "Total.Recoverable.Calcium...mg.L." = 'Calcium, Total recoverable',
+                                       "Total.Recoverable.Chromium...µg.L." = 'Chromium, Total recoverable',
+                                       "Total.Recoverable.Cobalt...µg.L." = 'Cobalt, Total recoverable',
+                                       "Total.Recoverable.Copper...µg.L." = 'Copper, Total recoverable',
+                                       "Total.Recoverable.Iron...µg.L." = 'Iron, Total recoverable',
+                                       "Total.Recoverable.Lead...µg.L." = 'Lead, Total recoverable',
+                                       "Total.Recoverable.Magnesium...mg.L." = 'Magnesium, Total recoverable',
+                                       "Total.Recoverable.Molybdenum...µg.L." = 'Molybdenum, Total recoverable',
+                                       "Total.Recoverable.Nickel...µg.L." = 'Nickel, Total recoverable',
+                                       "Total.Recoverable.Selenium...µg.L." = 'Selenium, Total recoverable',
+                                       "Total.Recoverable.Silver...µg.L." = 'Silver, Total recoverable',
+                                       "Total.Recoverable.Thallium...µg.L." = 'Thallium, Total recoverable',
+                                       "Total.Recoverable.Uranium...µg.L." = 'Uranium, Total recoverable',
+                                       "Total.Recoverable.Vanadium...µg.L." = 'Vanadium, Total recoverable',
+                                       "Total.Recoverable.Zinc...µg.L." = 'Zinc, Total recoverable',
+                                       "Total.Suspended.Solids...mg.L." = 'Total Suspended Solids'))
+willy.metals <- within(willy.metals, rm('Sample.ID','pH...SU.','Conductivity','pH','Turbidity',
+                                        'Total Suspended Solids','QA_QC_TYPE','SAMPLING_EVENT_KEY'))
+willy.metals.melted <- melt(willy.metals, id.vars = c('SampleRegID','SampleAlias','Sampled'),variable.name = 'Analyte',value.name='tResult')
+willy.metals.melted$Sampled <- as.POSIXct(as.numeric(willy.metals.melted$Sampled)*24*3600 + as.POSIXct("1899-12-30 00:00") )
+willy.metals.melted$Sampled <- strftime(willy.metals.melted$Sampled, format = '%d-%b-%y')
+willy.metals.melted$SampleRegID <- substr(willy.metals.melted$SampleRegID, 1, 5)
+willy.metals.melted$SpecificMethod <- '200.8'
+willy.metals.melted$Project <- 'TMP-Water-Willamette'
+willy.metals.melted$tMRL<- NA
+willy.metals.melted$Unit <- willy.metals.melted$Analyte
+willy.metals.melted$Unit <- mapvalues(willy.metals.melted$Unit, 
+                                      from = unique(willy.metals.melted$Analyte), 
+                                      to = c('µg/L','µg/L','µg/L','µg/L','µg/L','mg/L','µg/L','µg/L','µg/L','µg/L',
+                                             'µg/L','mg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L'))
+willy.metals.melted$tResult <- ifelse(substr(willy.metals.melted$tResult,1,1) == '<','ND',willy.metals.melted$tResult)
+willy.metals.melted$Status <- 'A'
+willy.metals.melted$SampleType <- ''
+
+data.2011 <- data.2011[,names(willy.data)]
+
+#data.2011 <- data.2011[,names(data.2012)]
+#willy.data <- willy.data[,names(data.2012)]
+
+lasar <- rbind(data.2011, willy.data)
+
+
+#This makes the lasar data for metals names equal to the metals names as they are in Element
+lasar[lasar$METHOD_CODE == '200.8','NAME'] <- gsub('R', 'r', (paste(lasar[lasar$METHOD_CODE == '200.8','NAME'], 
+                                                                          lasar[lasar$METHOD_CODE == '200.8','PARAMETER_MODIFIER_ABBREVIATION'], 
+                                                                          sep = ', ')))
+
+
+
+lasar <- rename(lasar, c('SUBPROJECT_NAME' = 'Project', 'STATION' = 'SampleRegID', 'DESCRIPTION' = 'SampleAlias','SAMPLE_DATE' = 'Sampled', 
+                         'QA_QC_TYPE' = 'SampleType','NAME' = 'Analyte', 'PRV' = 'tResult', 'METHOD_REPORTING_LIMIT' = 'tMRL', 'UNIT' = 'Unit', 
+                         'METHOD_CODE' = 'SpecificMethod', 'STATUS' = 'Status'))
+
+#this makes the columns in the LASAR data match the columns in the Element data frame
+lasar <- lasar[,names(data.2012)]
+
+#this file is to reconcile the names between lasar and element
+lasar.to.element <- read.xlsx('//deqlead01/wqm/TOXICS_2012/Data/lasar_to_element.xlsx', sheetName = 'Lasar to Element All')
+
+lasar.to.element[lasar.to.element$Element.Analyte == '4,4Â´-DDD','Element.Analyte'] <- '4,4´-DDD'
+lasar.to.element[lasar.to.element$Element.Analyte == '4,4Â´-DDE','Element.Analyte'] <- '4,4´-DDE'
+lasar.to.element[lasar.to.element$Element.Analyte == '4,4Â´-DDT','Element.Analyte'] <- '4,4´-DDT'
+
+lasar.change <- lasar.to.element[!is.na(lasar.to.element$Lasar.Name.full),]
+
+lasar.change <- lasar.change[lasar.change$Lasar.Name.full != '',]
+
+#the name reconciliation occurs in the next four lines of code
+lasar.change.vector <- lasar.change$Element.Analyte
+names(lasar.change.vector) <- lasar.change$Lasar.Name.full
+
+lasar$Analyte <- as.factor(lasar$Analyte)
+
+lasar$Analyte <- revalue(lasar$Analyte, lasar.change.vector)
+
+
+
+#this puts the LASAR and Element data together
+data <- rbind(data.2012, lasar, willy.metals.melted)
+
+#There are several stations that have double spaces in their names and several stations that double spaces for some records
+#and not others. This removes those double spaces for consistent naming.
+data$SampleAlias <- gsub("  "," ",data$SampleAlias)
+
+#This pulls out empty rows
+data <- data[!is.na(data$SampleRegID),]
+
+#We also only want to include A and B data
+data <- data[data$Status %in% c('A','A+','B'),]
+
+#we also want to add in the Focus List Categories
+categories <- read.xlsx2('//deqlead01/wqm/toxics_2012/data/Focus list and 737 categories.xlsx', sheetName = 'Sheet1')
+#inside.file <- read.xlsx2('//deqlead01/wqm/toxics_2012/data/2011 Access export & basin summaries 4DecKG.xlsx', sheetName = '737 & Focus List categories')
+#category.vector <- lasar.to.element[!is.na(lasar.to.element$categories.Chemical),'Element.Analyte']
+#names(category.vector) <- lasar.to.element[!is.na(lasar.to.element$categories.Chemical),'categories.Chemical']
+categories.sub <- categories[,c('Chemical','chem.group')]
+test <- merge(data, categories.sub, by.x = 'Analyte', by.y = 'Chemical')
+sub <- test[!duplicated(test$Analyte),c('Analyte','Analyte')]
+sub <- rename(sub, c('Analyte.1' = 'categories.Chemical'))
+sub2 <- lasar.to.element[!is.na(lasar.to.element$categories.Chemical),c('Element.Analyte','categories.Chemical')]
+sub2 <- rename(sub2, c('Element.Analyte' = 'Analyte'))
+categories.mapped <- rbind(sub, sub2)
+
+categories.mapped.vector <- categories.mapped$Analyte
+names(categories.mapped.vector) <- categories.mapped$categories.Chemical
+categories$Chemical <- as.factor(categories$Chemical)
+categories$Chemical <- revalue(categories$Chemical, categories.mapped.vector)
+categories$Chemical <- as.character(categories$Chemical)
+
+categories.sub <- categories[,c('Chemical','chem.group')]
+categories.sub <- categories.sub[!duplicated(categories.sub$Chemical),]
+
+data.w.categories <- merge(data, categories.sub, by.x = 'Analyte', by.y = 'Chemical', all.x = TRUE)
+unmatched.analytes <- unique(data.w.categories[is.na(data.w.categories$chem.group),'Analyte'])
+
+#### Output combined data table ####
+#write.xlsx(data, '//deqlead01/wqm/TOXICS_2012/Data/Analysis_through_2012/All_TMP_Water_Data_through_2012.xlsx', sheetName = 'AllDataThrough2012')
+
+#### Continue with data analysis ####
+#this eliminates VOIDED samples
+data.wo.void <- data.w.categories[!data.w.categories$tResult %in% c('VOID','Void','Cancelled','',NA),]
+
+#this sets the value for all the NDs to 0
+data.wo.void[data.wo.void$tResult %in% c('ND','ND*'),'tResult'] <- 0
+
+#This converts the MRL to a numeric field
+data.wo.void$tMRL<- as.numeric(data.wo.void$tMRL)
+
+#this converts the tResult to a numeric field
+data.wo.void$tResult <- as.numeric(data.wo.void$tResult)
+
+#Apparently the reporting limit for DEET has been raised to 30 per Lori
+data.wo.void[data.wo.void$Analyte == 'DEET','tMRL'] <- 30
+
+#populate the detect.nondetect column
+data.wo.void[!is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void[!is.na(data.wo.void$tMRL),'tResult'] 
+                                                                     < data.wo.void[!is.na(data.wo.void$tMRL),'tMRL'],
+                                                                     0, 1)
+data.wo.void[is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void[is.na(data.wo.void$tMRL),'tResult'] == 0,
+                                                                                      0, 1) 
+
+rm(list = setdiff(ls(), c('data.wo.void','categories.sub')))
+
+# Select dbo.REPWRK.Client, dbo.REPWRK.Project, dbo.REPWRK.Wrk,
+# dbo.REPSAMPLE.Sample, dbo.REPSAMPLE.SampleAlias, dbo.REPSAMPLE.SampleRegID,
+# dbo.REPSAMPLE.SampleType, dbo.REPSAMPLE.ClientMatrix, dbo.REPSAMPLE.Sampled,
+# dbo.REPSAMPLEANALYSIS.Analysis, dbo.REPSAMPLEANALYSIS.SpecificMethod,
+# dbo.REPSAMPLEANALYTE.Analyte, dbo.REPSAMPLEANALYTE.tMRL,
+# dbo.REPSAMPLEANALYTE.tResult, dbo.REPSAMPLEANALYTE.FinalUnits As 'Unit',
+# dbo.REPSAMPLEANALYTE.AnalyteNotes as 'AnalyteQualifiers', dbo.REPSAMPLEANALYSIS.SampleNotes as 'SampleQualifiers'
+# From dbo.REPWRK Inner Join
+# dbo.REPSAMPLE On dbo.REPWRK.Wrk = dbo.REPSAMPLE.Wrk Inner Join
+# dbo.REPSAMPLEANALYSIS On dbo.REPSAMPLEANALYSIS.Sample = dbo.REPSAMPLE.Sample
+# And dbo.REPSAMPLE.Wrk = dbo.REPSAMPLEANALYSIS.Wrk Inner Join
+# dbo.REPSAMPLEANALYTE On dbo.REPSAMPLEANALYSIS.Analysis =
+#   dbo.REPSAMPLEANALYTE.Analysis And dbo.REPSAMPLEANALYSIS.Sample =
+#   dbo.REPSAMPLEANALYTE.Sample And dbo.REPSAMPLEANALYSIS.Wrk =
+#   dbo.REPSAMPLEANALYTE.Wrk
+# Where dbo.REPWRK.Wrk In (1212093, 1212094, 1212092, 1212088, 1212105, 1212103,
+#                          1212104, 1212106, 1212005, 1212010,
+#                          1212009, 1212007, 1212102, 1212099,
+#                          1212101, 1212100, 1212108, 1212107,
+#                          1212083, 1212089, 1212081, 1212082,
+#                          1212002, 1212001, 1211023, 1211024, 1211026)And
+#dbo.REPSAMPLEANALYTE.SUR = 'FALSE' And
+#dbo.REPSAMPLEANALYTE.Analyte NOT LIKE '%2C%'
+# Order By dbo.REPWRK.Wrk, dbo.REPSAMPLE.Sample, dbo.REPSAMPLEANALYTE.Analyte
