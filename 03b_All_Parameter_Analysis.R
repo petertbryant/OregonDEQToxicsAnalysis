@@ -20,6 +20,13 @@ data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
 criteria.for.analytes.we.have <- criteria.values.melted.applicable[criteria.values.melted.applicable$Pollutant %in% data.wo.void$Analyte,]
 data.wo.void.w.criteria <- merge(data.wo.void, criteria.for.analytes.we.have, by.x = 'Analyte', by.y = 'Pollutant', all = TRUE)
 
+#bring in just the metals criteria (this is testing for now and should really be added to the master criteria table)
+metals.criteria <- read.xlsx('//deqlead01/wqm/TOXICS_2012/Data/Criteria_benchmarks_etc/Metals_Table30_Table40.xlsx', sheetName = 'Sheet1')
+metals.criteria.melted <- melt(metals.criteria, id.vars = 'NAME')
+metals.criteria.melted.applicable <- metals.criteria.melted[!is.na(metals.criteria.melted$value),]
+
+
+
 #need to do unit conversion/mapping
 data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','tResult'] <- data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','tResult'] / 1000
 data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','Unit'] <-  "µg/L"

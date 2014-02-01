@@ -11,8 +11,8 @@ constants <- data.frame('Name.alone' = c('Cadmium', 'Copper', 'Cadmium', 'Chromi
                         'CFA' = c(1, 1, 1, 0.316, 1, 0.998, 0.85, 0.978),
                         'CFC' = c(1, 1, 1, 0.860, 1, 0.997, 0.85, 0.986))
 
-#This removes the Chromium III hardness dependent criteria. If you want to include it, comment out this line.
-constants <- constants[constants$Name.alone != 'Chromium',]
+
+
 
 #the general case -- This requires two input dataframes, a detect dataframe and a constants dataframe. the detect dataframe must have
 #the detect columns     Name.full: A concatentation of Total Recoverable or Dissolved and the metal name with no space in between
@@ -24,7 +24,11 @@ constants <- constants[constants$Name.alone != 'Chromium',]
 #                          mA, bA: The coefficients for acute criteria calculation
 #                          mC, bC: The coefficients for chronic criteria calculation
 #                        CFA, CFC: The conversion factor for converting between total and dissolved criteria
-hardnessEval <- function(metal, df){
+#The option remove.chromium removes the Chromium III hardness dependent criteria. If you want to include it, set it to FALSE.
+hardnessEval <- function(metal, df, remove.chromium = TRUE){
+  if(remove.chromium == FALSE) {
+    constants <- constants[constants$Name.alone != 'Chromium',]
+  }
   #name.split <- strsplit(df$Analyte, split = ', ')
   
   #name.split <- data.frame(matrix(unlist(name.split), nrow=length(name.split), byrow=T))

@@ -23,7 +23,12 @@ data.w.lu <- data.w.lu[!is.na(data.w.lu$DomLU),]
 
 #we also don't really want to include standard parameters here, plant or animal sterols and metals without criteria
 #The chemicals that don't match to a category
-dwn.sub <- data.w.lu[!data.w.lu$chem.group %in% c('Metals','Standard Parameters','NA','Plant or animal sterols') & !is.na(data.w.lu$chem.group),]
+dwn.sub <- data.w.lu[!data.w.lu$chem.group %in% c('Standard Parameters','NA','Plant or animal sterols') & !is.na(data.w.lu$chem.group),]
+dwn.sub <- dwn.sub[!dwn.sub$Analyte %in% c('Antimony, Dissolved','Barium, Dissolved', 'Beryllium, Dissolved', 'Beryllium, Total recoverable',
+                                           'Calcium, Dissolved', 'Calcium, Total recoverable', 'Chromium, Total recoverable', 'Cobalt, Total recoverable', 
+                                           'Copper, Dissolved', 'Iron, Dissolved', 'Lead, Total recoverable', 'Magnesium, Dissolved', 
+                                           'Magnesium, Total recoverable', 'Manganese, Dissolved', 'Manganese, Total recoverable',
+                                           'Silver, Total recoverable', 'Thallium, Dissolved', 'Molybdenum, Total recoverable'),]
 
 #list of unique detections with counts of nondetects and detects
 detect.counts <- as.data.frame.matrix(table(dwn.sub$Analyte, dwn.sub$Detect.nondetect))

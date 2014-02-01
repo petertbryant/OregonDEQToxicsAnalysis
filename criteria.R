@@ -1,5 +1,6 @@
 require(plyr)
 require(reshape2)
+require(stringr)
 options('scipen' = 100)
 
 criteria <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Criteria_benchmarks_etc/Criteria.csv', stringsAsFactors = FALSE)

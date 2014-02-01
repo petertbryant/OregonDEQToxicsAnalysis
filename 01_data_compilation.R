@@ -121,38 +121,39 @@ data.2012 <- data.2012[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'Sa
 data.2011 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/2011allBasins.csv', stringsAsFactors = FALSE)
 willy.data <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Willamette water data.csv', stringsAsFactors = FALSE)
 
-willy.metals <- read.xlsx2('//deqlead01/wqm/TOXICS_2012/Data/willamette metals_KG.xlsx', sheetName = 'Sheet2')
+willy.metals <- read.xlsx('//deqlead01/wqm/TOXICS_2012/Data/willamette metals_KG.xlsx', sheetName = 'Sheet2')
 willy.metals <- rename(willy.metals, c("Sampling.Event.Number" = 'SAMPLING_EVENT_KEY', "Station.Identifier" = 'SampleRegID', 
                                        "Station.Description" = 'SampleAlias', "Sample.Date.Time" = 'Sampled',
                                        "QA.QC.Type" = 'QA_QC_TYPE', 
-                                       "Field.Conductivity...µmhos.cm...25..C." = 'Conductivity',
+                                       "Field.Conductivity...Âµmhos.cm...25Â..C." = 'Conductivity',
                                        "Field.pH...SU." = 'pH', 
                                        "Field.Turbidity...NTU." = 'Turbidity', 
                                        "TR.Antimony.Result" = 'Antimony, Total recoverable', 
-                                       "Total.Recoverable.Arsenic...µg.L." = 'Arsenic, Total recoverable',
-                                       "Total.Recoverable.Barium...µg.L." = 'Barium, Total recoverable',
-                                       "Total.Recoverable.Beryllium...µg.L." = 'Beryllium, Total recoverable',
-                                       "Total.Recoverable.Cadmium...µg.L." = 'Cadmium, Total recoverable',
+                                       "Total.Recoverable.Arsenic...Âµg.L." = 'Arsenic, Total recoverable',
+                                       "Total.Recoverable.Barium...Âµg.L." = 'Barium, Total recoverable',
+                                       "Total.Recoverable.Beryllium...Âµg.L." = 'Beryllium, Total recoverable',
+                                       "Total.Recoverable.Cadmium...Âµg.L." = 'Cadmium, Total recoverable',
                                        "Total.Recoverable.Calcium...mg.L." = 'Calcium, Total recoverable',
-                                       "Total.Recoverable.Chromium...µg.L." = 'Chromium, Total recoverable',
-                                       "Total.Recoverable.Cobalt...µg.L." = 'Cobalt, Total recoverable',
-                                       "Total.Recoverable.Copper...µg.L." = 'Copper, Total recoverable',
-                                       "Total.Recoverable.Iron...µg.L." = 'Iron, Total recoverable',
-                                       "Total.Recoverable.Lead...µg.L." = 'Lead, Total recoverable',
+                                       "Total.Recoverable.Chromium...Âµg.L." = 'Chromium, Total recoverable',
+                                       "Total.Recoverable.Cobalt...Âµg.L." = 'Cobalt, Total recoverable',
+                                       "Total.Recoverable.Copper...Âµg.L." = 'Copper, Total recoverable',
+                                       "Total.Recoverable.Iron...Âµg.L." = 'Iron, Total recoverable',
+                                       "Total.Recoverable.Lead...Âµg.L." = 'Lead, Total recoverable',
                                        "Total.Recoverable.Magnesium...mg.L." = 'Magnesium, Total recoverable',
-                                       "Total.Recoverable.Molybdenum...µg.L." = 'Molybdenum, Total recoverable',
-                                       "Total.Recoverable.Nickel...µg.L." = 'Nickel, Total recoverable',
-                                       "Total.Recoverable.Selenium...µg.L." = 'Selenium, Total recoverable',
-                                       "Total.Recoverable.Silver...µg.L." = 'Silver, Total recoverable',
-                                       "Total.Recoverable.Thallium...µg.L." = 'Thallium, Total recoverable',
-                                       "Total.Recoverable.Uranium...µg.L." = 'Uranium, Total recoverable',
-                                       "Total.Recoverable.Vanadium...µg.L." = 'Vanadium, Total recoverable',
-                                       "Total.Recoverable.Zinc...µg.L." = 'Zinc, Total recoverable',
-                                       "Total.Suspended.Solids...mg.L." = 'Total Suspended Solids'))
+                                       "Total.Recoverable.Molybdenum...Âµg.L." = 'Molybdenum, Total recoverable',
+                                       "Total.Recoverable.Nickel...Âµg.L." = 'Nickel, Total recoverable',
+                                       "Total.Recoverable.Selenium...Âµg.L." = 'Selenium, Total recoverable',
+                                       "Total.Recoverable.Silver...Âµg.L." = 'Silver, Total recoverable',
+                                       "Total.Recoverable.Thallium...Âµg.L." = 'Thallium, Total recoverable',
+                                       "Total.Recoverable.Uranium...Âµg.L." = 'Uranium, Total recoverable',
+                                       "Total.Recoverable.Vanadium...Âµg.L." = 'Vanadium, Total recoverable',
+                                       "Total.Recoverable.Zinc...Âµg.L." = 'Zinc, Total recoverable',
+                                       "Total.Suspended.Solids...mg.L." = 'Total Suspended Solids',
+                                       'CaCO3..mg.L.' = 'Hardness as CaCO3, Total recoverable'))
 willy.metals <- within(willy.metals, rm('Sample.ID','pH...SU.','Conductivity','pH','Turbidity',
                                         'Total Suspended Solids','QA_QC_TYPE','SAMPLING_EVENT_KEY'))
 willy.metals.melted <- melt(willy.metals, id.vars = c('SampleRegID','SampleAlias','Sampled'),variable.name = 'Analyte',value.name='tResult')
-willy.metals.melted$Sampled <- as.POSIXct(as.numeric(willy.metals.melted$Sampled)*24*3600 + as.POSIXct("1899-12-30 00:00") )
+#willy.metals.melted$Sampled <- as.POSIXct(as.numeric(willy.metals.melted$Sampled)*24*3600 + as.POSIXct("1899-12-30 00:00") )
 willy.metals.melted$Sampled <- strftime(willy.metals.melted$Sampled, format = '%d-%b-%y')
 willy.metals.melted$SampleRegID <- substr(willy.metals.melted$SampleRegID, 1, 5)
 willy.metals.melted$SpecificMethod <- '200.8'
@@ -162,7 +163,7 @@ willy.metals.melted$Unit <- willy.metals.melted$Analyte
 willy.metals.melted$Unit <- mapvalues(willy.metals.melted$Unit, 
                                       from = unique(willy.metals.melted$Analyte), 
                                       to = c('µg/L','µg/L','µg/L','µg/L','µg/L','mg/L','µg/L','µg/L','µg/L','µg/L',
-                                             'µg/L','mg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L'))
+                                             'µg/L','mg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','mg/L'))
 willy.metals.melted$tResult <- ifelse(substr(willy.metals.melted$tResult,1,1) == '<','ND',willy.metals.melted$tResult)
 willy.metals.melted$Status <- 'A'
 willy.metals.melted$SampleType <- ''
