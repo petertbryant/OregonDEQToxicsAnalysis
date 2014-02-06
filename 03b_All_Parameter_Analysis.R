@@ -50,41 +50,13 @@ casted.crit <- dcast(dvc.hm, ID ~ variable, value.var = 'value',
 casted.magnitude <- dcast(dvc.hm, ID ~ variable, value.var = 'magnitude',
                           fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),as.numeric(x))})
 
-casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:15],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
-casted.crit <- casted.crit[,c('ID',
-                              "Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism - Criteria Value", 
-                              "Table 40 Human Health Criteria for Toxic Pollutants - Organism Only - Criteria Value", 
-                              "Table 20 Toxic Substances - Freshwater Acute - Criteria Value", 
-                              "Table 20 Toxic Substances - Freshwater Chronic - Criteria Value", 
-                              "OPP Aquatic Life Benchmarks - Acute Fish - Criteria Value", 
-                              "OPP Aquatic Life Benchmarks - Chronic Fish - Criteria Value", 
-                              "OPP Aquatic Life Benchmarks - Acute Invertebrates - Criteria Value", 
-                              "OPP Aquatic Life Benchmarks - Chronic Invertebrates - Criteria Value", 
-                              "OPP Aquatic Life Benchmarks - Acute Nonvascular Plants - Criteria Value", 
-                              "OPP Aquatic Life Benchmarks - Acute Vascular Plants - Criteria Value", 
-                              "Office of Water Aquatic Life Criteria - Maximum Concentration (CMC) - Criteria Value", 
-                              "Office of Water Aquatic Life Criteria - Continuous Concentration (CCC) - Criteria Value", 
-                              "Table 30 Freshwater Acute - Criteria Value", 
-                              "Table 30 Freshwater Chronic - Criteria Value")]
+casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:13],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
+casted.crit <- casted.crit[,setdiff(names(casted.crit),'NA')]
 
 cec <- merge(casted.exceed, casted.crit, by = 'ID')
 
-casted.magnitude <- rename(casted.magnitude, sapply(names(casted.magnitude)[2:15],FUN = function(x) {paste(x, 'Magnitude', sep = ' - ')}))
-casted.magnitude <- casted.magnitude[,c('ID',
-                              "Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism - Magnitude", 
-                              "Table 40 Human Health Criteria for Toxic Pollutants - Organism Only - Magnitude", 
-                              "Table 20 Toxic Substances - Freshwater Acute - Magnitude", 
-                              "Table 20 Toxic Substances - Freshwater Chronic - Magnitude", 
-                              "OPP Aquatic Life Benchmarks - Acute Fish - Magnitude", 
-                              "OPP Aquatic Life Benchmarks - Chronic Fish - Magnitude", 
-                              "OPP Aquatic Life Benchmarks - Acute Invertebrates - Magnitude", 
-                              "OPP Aquatic Life Benchmarks - Chronic Invertebrates - Magnitude", 
-                              "OPP Aquatic Life Benchmarks - Acute Nonvascular Plants - Magnitude", 
-                              "OPP Aquatic Life Benchmarks - Acute Vascular Plants - Magnitude", 
-                              "Office of Water Aquatic Life Criteria - Maximum Concentration (CMC) - Magnitude", 
-                              "Office of Water Aquatic Life Criteria - Continuous Concentration (CCC) - Magnitude", 
-                              "Table 30 Freshwater Acute - Magnitude", 
-                              "Table 30 Freshwater Chronic - Magnitude")]
+casted.magnitude <- rename(casted.magnitude, sapply(names(casted.magnitude)[2:13],FUN = function(x) {paste(x, 'Magnitude', sep = ' - ')}))
+casted.magnitude <- casted.magnitude[,setdiff(names(casted.magnitude),'NA')]
 
 cecm <- merge(cec, casted.magnitude, by = 'ID')
 
@@ -92,15 +64,13 @@ cecm <- within(cecm, rm('ID','NA'))
 
 cecm.ordered <- cecm[,c(names(cecm)[1:13],sort(names(cecm)[14:55]))]
 
-names(casted) <- make.names(names(casted))
+names(casted.exceed) <- make.names(names(casted.exceed))
 
-dvc.hm.ru <- ddply(casted, .(Project,SampleRegID,SampleAlias,chem.group,Analyte), summarise, 
+dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte), summarise, 
                  Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism), 
                  Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only), 
-                 Table20.Acute.Exceed = sum(Table.20.Toxic.Substances...Freshwater.Acute),
-                 Table20.Chronic.Exceed = sum(Table.20.Toxic.Substances...Freshwater.Chronic),
-                 Table30.Chronic.Exceed = sum(Table.30.Freshwater.Chronic),
-                 Table30.Acute.Exceed = sum(Table.30.Freshwater.Acute),
+                 Table20.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute),
+                 Table20.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic),
                  OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish),
                  OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish),
                  OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates),

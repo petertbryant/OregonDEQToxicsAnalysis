@@ -14,8 +14,8 @@ criteria.values <- within(criteria, rm('Notes','No.', 'index', 'Sort', 'minimum.
 criteria.values <- criteria.values[!duplicated(criteria.values$Pollutant),]
 criteria.values <- rename(criteria.values , replace = c('Human.Health.Criteria...................Water...Organism..ug.L.'= 'Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism',
                                                         'Human.Health.Criteria..Organism.Only..ug.L.' = 'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only',
-                                                        'Freshwater.Acute.Criteria..CMC..ug.L' = 'Table 20 Toxic Substances - Freshwater Acute',
-                                                        'Freshwater.Chronic.Criteria..CCC..ug.L' = 'Table 20 Toxic Substances - Freshwater Chronic',
+                                                        'Freshwater.Acute.Criteria..CMC..ug.L' = 'Table 30 Toxic Substances - Freshwater Acute',
+                                                        'Freshwater.Chronic.Criteria..CCC..ug.L' = 'Table 30 Toxic Substances - Freshwater Chronic',
                                                         "Freshwater.Fish.Acute.1" = 'OPP Aquatic Life Benchmarks - Acute Fish',
                                                         "Freshwater.Fish.Chronic.2" = 'OPP Aquatic Life Benchmarks - Chronic Fish',
                                                         "Freshwater.Invertebrates.Acute.3" = 'OPP Aquatic Life Benchmarks - Acute Invertebrates',

@@ -42,10 +42,10 @@ hardness.crit.calc <- function(df, remove.chromium = TRUE) {
     }
   }
   
-  mhc$'Table 30 Freshwater Acute' <- exp(mhc$mA*(log(mhc$tResult.hardness)) + mhc$bA) * mhc$CFA
-  mhc$'Table 30 Freshwater Chronic' <- exp(mhc$mC*(log(mhc$tResult.hardness)) + mhc$bC) * mhc$CFC
+  mhc$'Table 30 Toxic Substances - Freshwater Acute' <- exp(mhc$mA*(log(mhc$tResult.hardness)) + mhc$bA) * mhc$CFA
+  mhc$'Table 30 Toxic Substances - Freshwater Chronic' <- exp(mhc$mC*(log(mhc$tResult.hardness)) + mhc$bC) * mhc$CFC
   
-  mhc.melted <- melt(mhc, measure.vars = c('Table 30 Freshwater Acute', 'Table 30 Freshwater Chronic'))
+  mhc.melted <- melt(mhc, measure.vars = c('Table 30 Toxic Substances - Freshwater Acute', 'Table 30 Toxic Substances - Freshwater Chronic'))
   
   mhcm <- mhc.melted[!is.na(mhc.melted$value),]
   

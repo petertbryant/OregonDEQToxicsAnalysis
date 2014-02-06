@@ -250,7 +250,29 @@ data.w.categories <- merge(data, categories.sub, by.x = 'Analyte', by.y = 'Chemi
 unmatched.analytes <- unique(data.w.categories[is.na(data.w.categories$chem.group),'Analyte'])
 
 #### Output combined data table ####
-#write.xlsx(data, '//deqlead01/wqm/TOXICS_2012/Data/Analysis_through_2012/All_TMP_Water_Data_through_2012.xlsx', sheetName = 'AllDataThrough2012')
+#creates a column that will be used just for numeric representation. this allows an output table to include all the voided and cancelled data
+data.w.categories$Result <- data.w.categories$tResult
+
+#this sets the value for all the NDs to 0 and creates a column that can be all numeric
+data.w.categories[data.w.categories$tResult %in% c('VOID','Void','Cancelled','',NA,'ND','ND*'),'Result'] <- 0
+
+#This converts the MRL to a numeric field
+data.w.categories$tMRL<- as.numeric(data.w.categories$tMRL)
+
+#this converts the tResult to a numeric field
+data.w.categories$Result <- as.numeric(data.w.categories$Result)
+
+#Apparently the reporting limit for DEET has been raised to 30 per Lori
+data.w.categories[data.w.categories$Analyte == 'DEET','tMRL'] <- 30
+
+#populate the detect.nondetect column
+data.w.categories[!is.na(data.w.categories$tMRL),'Detect.nondetect'] <- ifelse(data.w.categories[!is.na(data.w.categories$tMRL),'Result'] 
+                                                                     < data.w.categories[!is.na(data.w.categories$tMRL),'tMRL'],
+                                                                     0, 1)
+data.w.categories[is.na(data.w.categories$tMRL),'Detect.nondetect'] <- ifelse(data.w.categories[is.na(data.w.categories$tMRL),'Result'] == 0,
+                                                                    0, 1) 
+
+#write.xlsx(data.w.categories, '//deqlead01/wqm/TOXICS_2012/Data/All_TMP_Water_Data_through_2012.xlsx', sheetName = 'AllDataThrough2012')
 
 #### Continue with data analysis ####
 #this eliminates VOIDED samples
