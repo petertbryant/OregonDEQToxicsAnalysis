@@ -125,29 +125,29 @@ willy.metals <- read.xlsx('//deqlead01/wqm/TOXICS_2012/Data/willamette metals_KG
 willy.metals <- rename(willy.metals, c("Sampling.Event.Number" = 'SAMPLING_EVENT_KEY', "Station.Identifier" = 'SampleRegID', 
                                        "Station.Description" = 'SampleAlias', "Sample.Date.Time" = 'Sampled',
                                        "QA.QC.Type" = 'QA_QC_TYPE', 
-                                       "Field.Conductivity...µmhos.cm...25�..C." = 'Conductivity',
+                                       "Field.Conductivity...Âµmhos.cm...25Â..C." = 'Conductivity',
                                        "Field.pH...SU." = 'pH', 
                                        "Field.Turbidity...NTU." = 'Turbidity', 
                                        "TR.Antimony.Result" = 'Antimony, Total recoverable', 
-                                       "Total.Recoverable.Arsenic...µg.L." = 'Arsenic, Total recoverable',
-                                       "Total.Recoverable.Barium...µg.L." = 'Barium, Total recoverable',
-                                       "Total.Recoverable.Beryllium...µg.L." = 'Beryllium, Total recoverable',
-                                       "Total.Recoverable.Cadmium...µg.L." = 'Cadmium, Total recoverable',
+                                       "Total.Recoverable.Arsenic...Âµg.L." = 'Arsenic, Total recoverable',
+                                       "Total.Recoverable.Barium...Âµg.L." = 'Barium, Total recoverable',
+                                       "Total.Recoverable.Beryllium...Âµg.L." = 'Beryllium, Total recoverable',
+                                       "Total.Recoverable.Cadmium...Âµg.L." = 'Cadmium, Total recoverable',
                                        "Total.Recoverable.Calcium...mg.L." = 'Calcium, Total recoverable',
-                                       "Total.Recoverable.Chromium...µg.L." = 'Chromium, Total recoverable',
-                                       "Total.Recoverable.Cobalt...µg.L." = 'Cobalt, Total recoverable',
-                                       "Total.Recoverable.Copper...µg.L." = 'Copper, Total recoverable',
-                                       "Total.Recoverable.Iron...µg.L." = 'Iron, Total recoverable',
-                                       "Total.Recoverable.Lead...µg.L." = 'Lead, Total recoverable',
+                                       "Total.Recoverable.Chromium...Âµg.L." = 'Chromium, Total recoverable',
+                                       "Total.Recoverable.Cobalt...Âµg.L." = 'Cobalt, Total recoverable',
+                                       "Total.Recoverable.Copper...Âµg.L." = 'Copper, Total recoverable',
+                                       "Total.Recoverable.Iron...Âµg.L." = 'Iron, Total recoverable',
+                                       "Total.Recoverable.Lead...Âµg.L." = 'Lead, Total recoverable',
                                        "Total.Recoverable.Magnesium...mg.L." = 'Magnesium, Total recoverable',
-                                       "Total.Recoverable.Molybdenum...µg.L." = 'Molybdenum, Total recoverable',
-                                       "Total.Recoverable.Nickel...µg.L." = 'Nickel, Total recoverable',
-                                       "Total.Recoverable.Selenium...µg.L." = 'Selenium, Total recoverable',
-                                       "Total.Recoverable.Silver...µg.L." = 'Silver, Total recoverable',
-                                       "Total.Recoverable.Thallium...µg.L." = 'Thallium, Total recoverable',
-                                       "Total.Recoverable.Uranium...µg.L." = 'Uranium, Total recoverable',
-                                       "Total.Recoverable.Vanadium...µg.L." = 'Vanadium, Total recoverable',
-                                       "Total.Recoverable.Zinc...µg.L." = 'Zinc, Total recoverable',
+                                       "Total.Recoverable.Molybdenum...Âµg.L." = 'Molybdenum, Total recoverable',
+                                       "Total.Recoverable.Nickel...Âµg.L." = 'Nickel, Total recoverable',
+                                       "Total.Recoverable.Selenium...Âµg.L." = 'Selenium, Total recoverable',
+                                       "Total.Recoverable.Silver...Âµg.L." = 'Silver, Total recoverable',
+                                       "Total.Recoverable.Thallium...Âµg.L." = 'Thallium, Total recoverable',
+                                       "Total.Recoverable.Uranium...Âµg.L." = 'Uranium, Total recoverable',
+                                       "Total.Recoverable.Vanadium...Âµg.L." = 'Vanadium, Total recoverable',
+                                       "Total.Recoverable.Zinc...Âµg.L." = 'Zinc, Total recoverable',
                                        "Total.Suspended.Solids...mg.L." = 'Total Suspended Solids',
                                        'CaCO3..mg.L.' = 'Hardness as CaCO3, Total recoverable'))
 willy.metals <- within(willy.metals, rm('Sample.ID','pH...SU.','Conductivity','pH','Turbidity',
@@ -162,8 +162,8 @@ willy.metals.melted$tMRL<- NA
 willy.metals.melted$Unit <- willy.metals.melted$Analyte
 willy.metals.melted$Unit <- mapvalues(willy.metals.melted$Unit, 
                                       from = unique(willy.metals.melted$Analyte), 
-                                      to = c('�g/L','�g/L','�g/L','�g/L','�g/L','mg/L','�g/L','�g/L','�g/L','�g/L',
-                                             '�g/L','mg/L','�g/L','�g/L','�g/L','�g/L','�g/L','�g/L','�g/L','�g/L','mg/L'))
+                                      to = c('µg/L','µg/L','µg/L','µg/L','µg/L','mg/L','µg/L','µg/L','µg/L','µg/L',
+                                             'µg/L','mg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','µg/L','mg/L'))
 willy.metals.melted$tResult <- ifelse(substr(willy.metals.melted$tResult,1,1) == '<','ND',willy.metals.melted$tResult)
 willy.metals.melted$Status <- 'A'
 willy.metals.melted$SampleType <- ''
@@ -193,9 +193,9 @@ lasar <- lasar[,names(data.2012)]
 #this file is to reconcile the names between lasar and element
 lasar.to.element <- read.xlsx('//deqlead01/wqm/TOXICS_2012/Data/lasar_to_element.xlsx', sheetName = 'Lasar to Element All')
 
-lasar.to.element[lasar.to.element$Element.Analyte == '4,4´-DDD','Element.Analyte'] <- '4,4�-DDD'
-lasar.to.element[lasar.to.element$Element.Analyte == '4,4´-DDE','Element.Analyte'] <- '4,4�-DDE'
-lasar.to.element[lasar.to.element$Element.Analyte == '4,4´-DDT','Element.Analyte'] <- '4,4�-DDT'
+lasar.to.element[lasar.to.element$Element.Analyte == '4,4´-DDD','Element.Analyte'] <- '4,4?-DDD'
+lasar.to.element[lasar.to.element$Element.Analyte == '4,4´-DDE','Element.Analyte'] <- '4,4?-DDE'
+lasar.to.element[lasar.to.element$Element.Analyte == '4,4´-DDT','Element.Analyte'] <- '4,4?-DDT'
 
 lasar.change <- lasar.to.element[!is.na(lasar.to.element$Lasar.Name.full),]
 
@@ -276,6 +276,8 @@ data.wo.void[is.na(data.wo.void$tMRL),'Detect.nondetect'] <- ifelse(data.wo.void
                                                                                       0, 1) 
 
 rm(list = setdiff(ls(), c('data.wo.void','categories.sub')))
+
+#write.csv(data.wo.void, '//deqlead01/wqm/toxics_2012/Data/R/Draft Outputs/TMP-Water-Complete-01062014.csv', row.names = FALSE)
 
 # Select dbo.REPWRK.Client, dbo.REPWRK.Project, dbo.REPWRK.Wrk,
 # dbo.REPSAMPLE.Sample, dbo.REPSAMPLE.SampleAlias, dbo.REPSAMPLE.SampleRegID,

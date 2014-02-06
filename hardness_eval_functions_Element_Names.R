@@ -11,7 +11,48 @@ constants <- data.frame('Name.alone' = c('Cadmium', 'Copper', 'Cadmium', 'Chromi
                         'CFA' = c(1, 1, 1, 0.316, 1, 0.998, 0.85, 0.978),
                         'CFC' = c(1, 1, 1, 0.860, 1, 0.997, 0.85, 0.986))
 
-
+hardness.crit.calc <- function(df, remove.chromium = TRUE) {
+  if(remove.chromium == FALSE) {
+    constants <- constants[constants$Name.alone != 'Chromium',]
+  }
+  
+  df$ID <- paste(df$SampleRegID, df$Sampled, substr(df$Analyte, nchar(df$Analyte), nchar(df$Analyte)))
+  
+  metals <- df[df$Analyte %in% constants$Analyte,]
+  
+  hardness <- df[grep('Hardness',df$Analyte),c('ID','Analyte','tResult')]
+  
+  mh <- merge(metals, hardness, by = 'ID', suffixes = c('.metal','.hardness'),all.x = TRUE)
+  
+  mh$tResult.hardness <- as.numeric(mh$tResult.hardness)
+  mh$tResult.hardness <- ifelse(mh$tResult.hardness < 25, 
+                                25, 
+                                ifelse(mh$tResult.hardness > 400, 
+                                       400, 
+                                       mh$tResult.hardness))
+  
+  mhc <- merge(mh, constants, by.x = 'Analyte.metal', by.y = 'Analyte', all.x = TRUE)
+  
+  for (i in 1:nrow(mhc)) {
+    if(mhc$Analyte.metal[i] == 'Cadmium, Dissolved') {
+      mhc$CFC[i] <- 1.101672-(log(mhc$tResult.hardness[i])*(0.041838))
+    } else if (mhc$Analyte.metal[i] == 'Lead, Dissolved') {
+      mhc$CFA[i] <- 1.46203-(log(mhc$tResult.hardness[i])*(0.145712))
+      mhc$CFC[i] <- 1.46203-(log(mhc$tResult.hardness[i])*(0.145712))
+    }
+  }
+  
+  mhc$'Table 30 Freshwater Acute' <- exp(mhc$mA*(log(mhc$tResult.hardness)) + mhc$bA) * mhc$CFA
+  mhc$'Table 30 Freshwater Chronic' <- exp(mhc$mC*(log(mhc$tResult.hardness)) + mhc$bC) * mhc$CFC
+  
+  mhc.melted <- melt(mhc, measure.vars = c('Table 30 Freshwater Acute', 'Table 30 Freshwater Chronic'))
+  
+  mhcm <- mhc.melted[!is.na(mhc.melted$value),]
+  
+  mhcm <- rename(mhcm, c('Analyte.metal' = 'Analyte', 'tResult.metal' = 'tResult'))
+  
+  return(mhcm)
+}
 
 
 #the general case -- This requires two input dataframes, a detect dataframe and a constants dataframe. the detect dataframe must have
@@ -29,6 +70,7 @@ hardnessEval <- function(metal, df, remove.chromium = TRUE){
   if(remove.chromium == FALSE) {
     constants <- constants[constants$Name.alone != 'Chromium',]
   }
+  
   #name.split <- strsplit(df$Analyte, split = ', ')
   
   #name.split <- data.frame(matrix(unlist(name.split), nrow=length(name.split), byrow=T))

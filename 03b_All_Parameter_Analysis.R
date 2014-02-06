@@ -1,4 +1,5 @@
 source('//deqlead01/wqm/TOXICS_2012/Data/R/criteria.R')
+source('//deqlead01/wqm/TOXICS_2012/Data/R/hardness_eval_functions_Element_Names.R')
 
 #before we can bring in the criteria we need to match names
 #unique(data.wo.void$Analyte)[!unique(data.wo.void$Analyte) %in% min.criteria.values$Pollutant]
@@ -15,32 +16,99 @@ data.wo.void$Analyte <- mapvalues(data.wo.void$Analyte, from = name.match.sub$na
 data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
 
 #brings in the criteria
-#data.wo.void <- merge(data.wo.void, min.criteria.values, by.x = 'Analyte', by.y = 'Pollutant', all.x = TRUE)
-
 criteria.for.analytes.we.have <- criteria.values.melted.applicable[criteria.values.melted.applicable$Pollutant %in% data.wo.void$Analyte,]
-data.wo.void.w.criteria <- merge(data.wo.void, criteria.for.analytes.we.have, by.x = 'Analyte', by.y = 'Pollutant', all = TRUE)
+dvc <- merge(data.wo.void, criteria.for.analytes.we.have, by.x = 'Analyte', by.y = 'Pollutant', all = TRUE)
 
-#bring in just the metals criteria (this is testing for now and should really be added to the master criteria table)
-metals.criteria <- read.xlsx('//deqlead01/wqm/TOXICS_2012/Data/Criteria_benchmarks_etc/Metals_Table30_Table40.xlsx', sheetName = 'Sheet1')
-metals.criteria.melted <- melt(metals.criteria, id.vars = 'NAME')
-metals.criteria.melted.applicable <- metals.criteria.melted[!is.na(metals.criteria.melted$value),]
-
-
+hm <- hardness.crit.calc(data.wo.void)
+hm <- hm[,names(dvc)]
+dvc.wo.hm <- dvc[!dvc$Analyte %in% hm$Analyte,]
+dvc.hm <- rbind(dvc.wo.hm, hm)
 
 #need to do unit conversion/mapping
-data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','tResult'] <- data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','tResult'] / 1000
-data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'ng/L','Unit'] <-  "µg/L"
+dvc.hm[dvc.hm$Unit == 'ng/L','tResult'] <- dvc.hm[dvc.hm$Unit == 'ng/L','tResult'] / 1000
+dvc.hm[dvc.hm$Unit == 'ng/L','Unit'] <-  "µg/L"
 
-data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'mg/L','tResult'] <- data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'mg/L','tResult'] * 1000
-data.wo.void.w.criteria[data.wo.void.w.criteria$Unit == 'mg/L','Unit'] <-  "µg/L"
+dvc.hm[dvc.hm$Unit == 'mg/L','tResult'] <- dvc.hm[dvc.hm$Unit == 'mg/L','tResult'] * 1000
+dvc.hm[dvc.hm$Unit == 'mg/L','Unit'] <-  "µg/L"
 
 #marks records that exceed the criteria or benchmark
-data.wo.void.w.criteria$exceed <- ifelse(data.wo.void.w.criteria$tResult >= data.wo.void.w.criteria$value, 1, 0)
+dvc.hm$exceed <- ifelse(dvc.hm$tResult >= dvc.hm$value, 1, 0)
 
 #magnitude
-data.wo.void.w.criteria$magnitude <- data.wo.void.w.criteria$tResult/data.wo.void.w.criteria$value
+dvc.hm$magnitude <- dvc.hm$tResult/dvc.hm$value
 
 #make it look pretty for excel
-View(dcast(data.wo.void.w.criteria, Project + SampleRegID + SampleAlias + Sampled + SampleType + Analyte + 
-             tResult + tMRL + Unit + SpecificMethod + Status + chem.group + Detect.nondetect ~ variable))
+#first make an id column to pull together the columns
+dvc.hm$ID <- paste(dvc.hm$Analyte, dvc.hm$Project, dvc.hm$SampleRegID, dvc.hm$SampleAlias, dvc.hm$Sampled, dvc.hm$SampleType, dvc.hm$tResult, dvc.hm$tMRL, dvc.hm$Unit, dvc.hm$SpecificMethod, dvc.hm$Status, dvc.hm$chem.group, dvc.hm$Detect.nondetect, sep='-')
+casted.exceed <- dcast(dvc.hm, ID + Project + SampleRegID + SampleAlias + Sampled + SampleType + Analyte + 
+                  tResult + tMRL + Unit + SpecificMethod + Status + chem.group + Detect.nondetect ~ variable, value.var = 'exceed',
+                fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),sum(as.numeric(x)))})
 
+casted.crit <- dcast(dvc.hm, ID ~ variable, value.var = 'value',
+                fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),as.numeric(x))})
+
+casted.magnitude <- dcast(dvc.hm, ID ~ variable, value.var = 'magnitude',
+                          fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),as.numeric(x))})
+
+casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:15],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
+casted.crit <- casted.crit[,c('ID',
+                              "Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism - Criteria Value", 
+                              "Table 40 Human Health Criteria for Toxic Pollutants - Organism Only - Criteria Value", 
+                              "Table 20 Toxic Substances - Freshwater Acute - Criteria Value", 
+                              "Table 20 Toxic Substances - Freshwater Chronic - Criteria Value", 
+                              "OPP Aquatic Life Benchmarks - Acute Fish - Criteria Value", 
+                              "OPP Aquatic Life Benchmarks - Chronic Fish - Criteria Value", 
+                              "OPP Aquatic Life Benchmarks - Acute Invertebrates - Criteria Value", 
+                              "OPP Aquatic Life Benchmarks - Chronic Invertebrates - Criteria Value", 
+                              "OPP Aquatic Life Benchmarks - Acute Nonvascular Plants - Criteria Value", 
+                              "OPP Aquatic Life Benchmarks - Acute Vascular Plants - Criteria Value", 
+                              "Office of Water Aquatic Life Criteria - Maximum Concentration (CMC) - Criteria Value", 
+                              "Office of Water Aquatic Life Criteria - Continuous Concentration (CCC) - Criteria Value", 
+                              "Table 30 Freshwater Acute - Criteria Value", 
+                              "Table 30 Freshwater Chronic - Criteria Value")]
+
+cec <- merge(casted.exceed, casted.crit, by = 'ID')
+
+casted.magnitude <- rename(casted.magnitude, sapply(names(casted.magnitude)[2:15],FUN = function(x) {paste(x, 'Magnitude', sep = ' - ')}))
+casted.magnitude <- casted.magnitude[,c('ID',
+                              "Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism - Magnitude", 
+                              "Table 40 Human Health Criteria for Toxic Pollutants - Organism Only - Magnitude", 
+                              "Table 20 Toxic Substances - Freshwater Acute - Magnitude", 
+                              "Table 20 Toxic Substances - Freshwater Chronic - Magnitude", 
+                              "OPP Aquatic Life Benchmarks - Acute Fish - Magnitude", 
+                              "OPP Aquatic Life Benchmarks - Chronic Fish - Magnitude", 
+                              "OPP Aquatic Life Benchmarks - Acute Invertebrates - Magnitude", 
+                              "OPP Aquatic Life Benchmarks - Chronic Invertebrates - Magnitude", 
+                              "OPP Aquatic Life Benchmarks - Acute Nonvascular Plants - Magnitude", 
+                              "OPP Aquatic Life Benchmarks - Acute Vascular Plants - Magnitude", 
+                              "Office of Water Aquatic Life Criteria - Maximum Concentration (CMC) - Magnitude", 
+                              "Office of Water Aquatic Life Criteria - Continuous Concentration (CCC) - Magnitude", 
+                              "Table 30 Freshwater Acute - Magnitude", 
+                              "Table 30 Freshwater Chronic - Magnitude")]
+
+cecm <- merge(cec, casted.magnitude, by = 'ID')
+
+cecm <- within(cecm, rm('ID','NA'))
+
+cecm.ordered <- cecm[,c(names(cecm)[1:13],sort(names(cecm)[14:55]))]
+
+names(casted) <- make.names(names(casted))
+
+dvc.hm.ru <- ddply(casted, .(Project,SampleRegID,SampleAlias,chem.group,Analyte), summarise, 
+                 Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism), 
+                 Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only), 
+                 Table20.Acute.Exceed = sum(Table.20.Toxic.Substances...Freshwater.Acute),
+                 Table20.Chronic.Exceed = sum(Table.20.Toxic.Substances...Freshwater.Chronic),
+                 Table30.Chronic.Exceed = sum(Table.30.Freshwater.Chronic),
+                 Table30.Acute.Exceed = sum(Table.30.Freshwater.Acute),
+                 OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish),
+                 OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish),
+                 OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates),
+                 OPP.Chronic.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Invertebrates),
+                 OPP.Acute.Nonvascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Nonvascular.Plants),
+                 OPP.Acute.Vascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Vascular.Plants),
+                 Office.of.Water.Acute.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Maximum.Concentration..CMC.),
+                 Office.of.Water.Chronic.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Continuous.Concentration..CCC.),
+                 sample.count = length(Detect.nondetect), 
+                 detect.count = sum(Detect.nondetect, na.rm = TRUE))
+dvc.hm.ru$percent.detect <- round(100*(dvc.hm.ru$detect.count/dvc.hm.ru$sample.count))

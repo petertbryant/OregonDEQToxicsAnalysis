@@ -26,6 +26,7 @@ criteria.values <- rename(criteria.values , replace = c('Human.Health.Criteria..
                                                         "Office.of.Water.Aquatic.Life.Criteria.Continuous.Concentration..CCC." = 'Office of Water Aquatic Life Criteria - Continuous Concentration (CCC)'))
 rownames(criteria.values) <- criteria.values[,1]
 criteria.values.melted <- melt(criteria.values, id.vars = 'Pollutant')
+hardness.pollutants <- criteria.values.melted[criteria.values.melted$value == 'hardness',]
 criteria.values.melted$value <- suppressWarnings(as.numeric(criteria.values.melted$value))
 
 criteria.values.melted.applicable <- criteria.values.melted[!is.na(criteria.values.melted$value),]
