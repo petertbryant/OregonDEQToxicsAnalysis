@@ -50,6 +50,9 @@ casted.crit <- dcast(dvc.hm, ID ~ variable, value.var = 'value',
 casted.magnitude <- dcast(dvc.hm, ID ~ variable, value.var = 'magnitude',
                           fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),as.numeric(x))})
 
+casted.exceed <- rename(casted.exceed, sapply(names(casted.exceed)[2:13],FUN = function(x) {paste(x, 'Exceed', sep = ' - ')}))
+casted.exceed <- casted.exceed[,setdiff(names(casted.exceed),'NA')]
+
 casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:13],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
 casted.crit <- casted.crit[,setdiff(names(casted.crit),'NA')]
 
