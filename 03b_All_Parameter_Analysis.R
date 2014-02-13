@@ -61,7 +61,7 @@ casted.magnitude <- dcast(dvc.hm, ID ~ variable, value.var = 'magnitude',
                           fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),as.numeric(x))})
 
 #Now we need to make sure the column names reflect what was calculated 
-casted.exceed <- rename(casted.exceed, sapply(names(casted.exceed)[2:13],FUN = function(x) {paste(x, 'Exceed', sep = ' - ')}))
+casted.exceed <- rename(casted.exceed, sapply(names(casted.exceed)[15:26],FUN = function(x) {paste(x, 'Exceed', sep = ' - ')}))
 casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:13],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
 casted.magnitude <- rename(casted.magnitude, sapply(names(casted.magnitude)[2:13],FUN = function(x) {paste(x, 'Magnitude', sep = ' - ')}))
 
@@ -87,23 +87,66 @@ cecm.ordered <- cecm[,c(names(cecm)[1:13],sort(names(cecm)[14:55]))]
 #that R can work with (i.e. no spaces).
 names(casted.exceed) <- make.names(names(casted.exceed))
 
-#Here is where the summary happens. Summing the exceedances for each Standard or Benchmark
-dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte), summarise, 
-                 Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism), 
-                 Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only), 
-                 Table30.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute),
-                 Table30.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic),
-                 OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish),
-                 OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish),
-                 OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates),
-                 OPP.Chronic.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Invertebrates),
-                 OPP.Acute.Nonvascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Nonvascular.Plants),
-                 OPP.Acute.Vascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Vascular.Plants),
-                 Office.of.Water.Acute.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Maximum.Concentration..CMC.),
-                 Office.of.Water.Chronic.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Continuous.Concentration..CCC.),
+#Here is where the summary happens. Summing the exceedances for each Standard or Benchmark 
+#NOTE: might want to consider adding percent exceed for each criteria or at least the DEQ Tables
+#code would look like(untested): Table40.WO.Percent.Exceed = (sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed)/length(Detect.nondetect))*100
+dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte,SpecificMethod), summarise, 
+                 Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed), 
+                 Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only...Exceed), 
+                 Table30.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute...Exceed),
+                 Table30.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic...Exceed),
+                 OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish...Exceed),
+                 OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish...Exceed),
+                 OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates...Exceed),
+                 OPP.Chronic.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Invertebrates...Exceed),
+                 OPP.Acute.Nonvascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Nonvascular.Plants...Exceed),
+                 OPP.Acute.Vascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Vascular.Plants...Exceed),
+                 Office.of.Water.Acute.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Maximum.Concentration..CMC....Exceed),
+                 Office.of.Water.Chronic.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Continuous.Concentration..CCC....Exceed),
                  sample.count = length(Detect.nondetect), 
                  detect.count = sum(Detect.nondetect, na.rm = TRUE))
 dvc.hm.ru$percent.detect <- round(100*(dvc.hm.ru$detect.count/dvc.hm.ru$sample.count))
 
 #This is also ready to be output now
 #write.csv(dvc.hm.ru, '//deqlead01/wqm/toxics_2012/data/TMP-Water-Criteria-Evaluation-Summary.csv',row.names=FALSE)
+
+#If you only want to see the Analytes that have a criteria or benchmark run this line
+dvc.ru.applicable <- dvc.hm.ru[rowSums(is.na(dvc.hm.ru[,7:18])) != ncol(dvc.hm.ru[,7:18]),]
+
+#If you only want to see the Analytes that exceed any criteria or benchmark run this line
+dvc.ru.exceed <- dvc.hm.ru[rowSums(dvc.hm.ru[,7:18],na.rm=TRUE) > 0,]
+
+#By basin summaries
+dvc.hm.detect <- dvc.hm[dvc.hm$Detect.nondetect > 0,]
+
+dvc.hm.basin <- ddply(dvc.hm.detect, .(Project,SampleRegID,SampleAlias,Analyte,SpecificMethod,chem.group),
+                      function(x){ifelse(is.na(which(x$tResult == max(x$tResult) & x$value == min(x$value))[1]),
+                                         df <- x[which.max(x$tResult),],
+                                         df <- x[which(x$tResult == max(x$tResult) & x$value == min(x$value))[1],])
+                                  return(df)})
+dvc.hm.basin[dvc.hm.basin$Anlayte %in% constants$Analyte,'value'] <- 'hardness'
+dvc.hm.basin$ID <- paste(dvc.hm.basin$Project, dvc.hm.basin$Analyte, dvc.hm.basin$SpecificMethod)
+
+dvc.ru.sub <- ddply(dvc.hm.ru, .(Project,Analyte,SpecificMethod,chem.group), summarise, 
+                    sample.count = sum(sample.count), 
+                    detect.count = sum(detect.count), 
+                    percent.detect = (sum(detect.count)/sum(sample.count))*100)
+dvc.ru.sub$ID <- paste(dvc.ru.sub$Project, dvc.ru.sub$Analyte, dvc.ru.sub$SpecificMethod)
+dvc.ru.sub <- dvc.ru.sub[,c('ID','sample.count','detect.count','percent.detect')]
+
+df.list <- list()
+for (i in 1:length(unique(dvc.hm.basin$Project))) {
+  dvc.hm.basin.sub <- dvc.hm.basin[dvc.hm.basin$Project == unique(dvc.hm.basin$Project)[i],]
+  df.list[[i]] <- dcast(dvc.hm.basin.sub, Project + Analyte + chem.group + SpecificMethod + variable + value + ID ~ SampleRegID + SampleAlias, value.var = 'tResult', fill = '')
+  df.list[[i]] <- merge(df.list[[i]], dvc.ru.sub, by = 'ID', all.x = TRUE)
+  df.list[[i]] <- within(df.list[[i]], rm('ID'))
+}
+
+#output the summary tables to excel
+for (i in 1:length(df.list)) {
+  basinName <- unique(df.list[[i]]$Project)
+  write.csv(df.list[[i]],paste('//deqlead01/wqm/toxics_2012/Data/',basinName,'-SummaryTable.csv',sep=''),row.names=FALSE)
+}
+
+
+
