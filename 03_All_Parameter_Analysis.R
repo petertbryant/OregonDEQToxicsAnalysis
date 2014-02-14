@@ -21,9 +21,25 @@ data.wo.void$Analyte <- mapvalues(data.wo.void$Analyte, from = name.match.sub$na
 
 data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
 
+#We will want to do some sort of merge with a station table to get Saltwater versus Freshwater designations 
+#for now I am arbitrarily picking two staitons to make saltwater to make sure the associations are working properly
+data.wo.void$Type <- ifelse(data.wo.void$SampleRegID %in% c(10332,37135),'SW','FW')
+
+#Now that we have the type populated we need an ID to match with the criteria
+data.wo.void$ID <- paste(data.wo.void$Analyte, data.wo.void$Type)
+
+#Some of the criteria apply to Totals and not individual degradates. Here we do that totalling so comparisons can be done.
+data.wo.void$code <- paste(data.wo.void$SampleRegID, data.wo.void$Sampled)
+ddt <- data.wo.void[data.wo.void$Analyte %in% c("4,4´-DDD", "4,4´-DDE", "4,4´-DDT"),]
+#now cast the ddt
+#calculate total
+#subset so it's total only
+#melt
+#rbind back to data without void
+
 #Now that the names are consistent we can match using analyte name and bring in the criteria
 criteria.for.analytes.we.have <- criteria.values.melted.applicable[criteria.values.melted.applicable$Pollutant %in% data.wo.void$Analyte,]
-dvc <- merge(data.wo.void, criteria.for.analytes.we.have, by.x = 'Analyte', by.y = 'Pollutant', all = TRUE)
+dvc <- merge(data.wo.void, criteria.for.analytes.we.have, by = 'ID', all = TRUE)
 
 #Using the hardness evaluation function loaded above we can calculate the hardness based criteria values
 #and bring them into the dataframe with the other criteria values. First, though we remove the hardness 
