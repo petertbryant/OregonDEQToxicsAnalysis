@@ -17,6 +17,8 @@ options('scipen' = 50, stringsAsFactors = FALSE)
 #is commented at the end of this file for future reference. NOTE: there may be an updated method for acquiring this data soon 2/10/14
 data.2012 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
 
+#######################################################################################################
+
 #The qualifiers from this query were concatenated into a single field which is kind of a pain to parse so in order to get Status
 #I queried the qualifier table directly and will make a status column that can then be merged with the data table.
 #NOTE: the updated query method should provide a dql column already populated
@@ -86,6 +88,8 @@ data.2012.w.qualifiers$Status <- ifelse(data.2012.w.qualifiers$tResult %in% c('V
 
 #this simplifies the qualifier and status columns and writes it back to the dataframe name that is used from here on
 data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
+
+######################################################################################
 
 #There is a site in the Deschutes basin that was sampled during a John Day basin sampling event and was associated with
 #the John Day Project. This puts it in the right Project for consistency.
@@ -193,6 +197,10 @@ willy.metals.melted$Unit <- mapvalues(willy.metals.melted$Unit,
 willy.metals.melted$tResult <- ifelse(substr(willy.metals.melted$tResult,1,1) == '<','ND',willy.metals.melted$tResult)
 willy.metals.melted$Status <- 'A'
 willy.metals.melted$SampleType <- ''
+
+lasar.data <- rbind(lasar, willy.metals.melted)
+
+write.csv(lasar.data, '//deqlead01/wqm/toxics_2012/data/TMP-Lasar-in-Element-Format-02142014.csv', row.names = FALSE)
 
 #this puts all of the LASAR and Element data together
 data <- rbind(data.2012, lasar, willy.metals.melted)

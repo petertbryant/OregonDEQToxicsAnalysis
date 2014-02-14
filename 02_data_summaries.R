@@ -9,6 +9,7 @@ data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699
 #to compare to land use we need to pull that file in
 lu <- read.xlsx('//deqlead03/gis_wa/project_working_folders/toxics/land use maps/attila_toxics_wshds.xlsx', sheetName = 'attila clip')
 data.w.lu <- merge(data.wo.newmethods, lu, by.x = 'SampleRegID', by.y = 'NAME', all.x = TRUE)
+#data.w.lu <- merge(data.wo.void, lu, by.x = 'SampleRegID', by.y = 'NAME', all.x = TRUE)
 data.w.lu <- rename(data.w.lu, c('X.50.' = 'DomLU'))
 
 #there are stations that we colelcted metals data at that didn't get included in Kara's initial Land Use analysis

@@ -40,7 +40,7 @@ dvc.hm[dvc.hm$Unit == 'ng/L','Unit'] <-  "µg/L"
 dvc.hm[dvc.hm$Unit == 'mg/L','tResult'] <- dvc.hm[dvc.hm$Unit == 'mg/L','tResult'] * 1000
 dvc.hm[dvc.hm$Unit == 'mg/L','Unit'] <-  "µg/L"
 
-#marks records that exceed the criteria or benchmark
+#marks records that exceed the criteria or benchmark - NEED TO ADD logic to handle SALTWATER/MARINE sites
 dvc.hm$exceed <- ifelse(dvc.hm$tResult >= dvc.hm$value, 1, 0)
 
 #calculates the magnitude or ratio of the result to the criteria
@@ -119,21 +119,32 @@ dvc.ru.exceed <- dvc.hm.ru[rowSums(dvc.hm.ru[,7:18],na.rm=TRUE) > 0,]
 #By basin summaries
 dvc.hm.detect <- dvc.hm[dvc.hm$Detect.nondetect > 0,]
 
+#This pulls out the maximum concentration at a site
 dvc.hm.basin <- ddply(dvc.hm.detect, .(Project,SampleRegID,SampleAlias,Analyte,SpecificMethod,chem.group),
                       function(x){ifelse(is.na(which(x$tResult == max(x$tResult) & x$value == min(x$value))[1]),
                                          df <- x[which.max(x$tResult),],
                                          df <- x[which(x$tResult == max(x$tResult) & x$value == min(x$value))[1],])
                                   return(df)})
+
+#For the hardness based criteria it doesn't make sense to report an actual value
 dvc.hm.basin[dvc.hm.basin$Anlayte %in% constants$Analyte,'value'] <- 'hardness'
+
+#This ID allows us to pull in the percent detect
 dvc.hm.basin$ID <- paste(dvc.hm.basin$Project, dvc.hm.basin$Analyte, dvc.hm.basin$SpecificMethod)
 
+#This makes the percent detect information available for joining
 dvc.ru.sub <- ddply(dvc.hm.ru, .(Project,Analyte,SpecificMethod,chem.group), summarise, 
                     sample.count = sum(sample.count), 
                     detect.count = sum(detect.count), 
                     percent.detect = (sum(detect.count)/sum(sample.count))*100)
+
+#This ID allows us to merge the percent detect with the concentration table
 dvc.ru.sub$ID <- paste(dvc.ru.sub$Project, dvc.ru.sub$Analyte, dvc.ru.sub$SpecificMethod)
+
+#We only need the ID and the percent detect info
 dvc.ru.sub <- dvc.ru.sub[,c('ID','sample.count','detect.count','percent.detect')]
 
+#This separates the basins into separate dataframes that are then merged with the percent detect info and then stored in a list
 df.list <- list()
 for (i in 1:length(unique(dvc.hm.basin$Project))) {
   dvc.hm.basin.sub <- dvc.hm.basin[dvc.hm.basin$Project == unique(dvc.hm.basin$Project)[i],]
@@ -142,7 +153,7 @@ for (i in 1:length(unique(dvc.hm.basin$Project))) {
   df.list[[i]] <- within(df.list[[i]], rm('ID'))
 }
 
-#output the summary tables to excel
+#output the individual basin summary tables to excel for pretty formatting
 for (i in 1:length(df.list)) {
   basinName <- unique(df.list[[i]]$Project)
   write.csv(df.list[[i]],paste('//deqlead01/wqm/toxics_2012/Data/',basinName,'-SummaryTable.csv',sep=''),row.names=FALSE)

@@ -36,14 +36,14 @@ min.criteria.values <- ddply(criteria.values.melted, .(Pollutant), function(m) {
   m <- m[m$value != 0,]
   if (all(is.na(m[m$variable %in% c('Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism', 
                                     'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only', 
-                                    'Table 20 Toxic Substances - Freshwater Acute', 
-                                    'Table 20 Toxic Substances - Freshwater Chronic'),'value']))) {
+                                    'Table 30 Toxic Substances - Freshwater Acute', 
+                                    'Table 30 Toxic Substances - Freshwater Chronic'),'value']))) {
     i = which(m$value == min(m$value,na.rm = T))
   } else {
     m <- m[m$variable %in% c('Table 40 Human Health Criteria for Toxic Pollutants - Water + Organism', 
                              'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only', 
-                             'Table 20 Toxic Substances - Freshwater Acute', 
-                             'Table 20 Toxic Substances - Freshwater Chronic'),]
+                             'Table 30 Toxic Substances - Freshwater Acute', 
+                             'Table 30 Toxic Substances - Freshwater Chronic'),]
     i = which(m$value == min(m$value,na.rm = T))
   }
   return (m[i,])
