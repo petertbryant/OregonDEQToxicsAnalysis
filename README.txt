@@ -1,2 +1,1 @@
-2014-01-02: Checking how changes show up in git diff
-2014-01-02: I am setting this project up with version control to better track the changes I make to the analysis for Toxics data
+This repo stores the current efforts of the Toxics Monitoring Program's data anlaysis and summarizations. The file 03 has the code that we want to persist into the future for availability to other data analysis efforts. Currently, the code in this folder is designed around being run with access to DEQ servers. 
