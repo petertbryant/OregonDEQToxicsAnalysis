@@ -49,7 +49,11 @@ hardness.crit.calc <- function(df, remove.chromium = TRUE) {
   
   mhcm <- mhc.melted[!is.na(mhc.melted$value),]
   
-  mhcm <- rename(mhcm, c('Analyte.metal' = 'Analyte', 'tResult.metal' = 'tResult'))
+  mhcm <- rename(mhcm, c('Analyte.metal' = 'Analyte', 'tResult.metal' = 'tResult', 'Type' = 'Type.x'))
+  
+  mhcm$Type.y <- 'FW'
+  
+  mhcm$Pollutant <- mhcm$Analyte
   
   return(mhcm)
 }
@@ -127,4 +131,32 @@ hardnessEval <- function(metal, df, remove.chromium = TRUE){
     return(metal.df.h)
   }
   
+}
+
+pentachlorophenol.crit.calc <- function(df) {
+
+  df$ID <- paste(df$SampleRegID, df$Sampled)
+  
+  penta <- df[df$Analyte == 'Pentachlorophenol',]
+  
+  ph <- df[df$Analyte == 'pH',c('ID','Analyte','tResult')]
+  
+  pp <- merge(penta, ph, by = 'ID', suffixes = c('.penta','.ph'),all.x = TRUE)
+  
+  pp$tResult.ph <- as.numeric(pp$tResult.ph)
+  
+  pp$'Table 30 Toxic Substances - Freshwater Acute' <- exp(1.005*(pp$tResult.ph)-4.869)
+  pp$'Table 30 Toxic Substances - Freshwater Chronic' <- exp(1.005*(pp$tResult.ph)-5.134)
+  
+  pp.melted <- melt(pp, measure.vars = c('Table 30 Toxic Substances - Freshwater Acute', 'Table 30 Toxic Substances - Freshwater Chronic'))
+  
+  ppm <- pp.melted[!is.na(pp.melted$value),]
+  
+  ppm <- rename(ppm, c('Analyte.penta' = 'Analyte', 'tResult.penta' = 'tResult', 'Type' = 'Type.x'))
+  
+  ppm$Type.y <- 'FW'
+  
+  ppm$Pollutant <- ppm$Analyte
+  
+  return(ppm)
 }

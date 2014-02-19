@@ -129,6 +129,7 @@ categories.sub <- categories[,c('Chemical','chem.group')]
 
 #This pulls matched names and mapped names from the lasar.to.element naming dataframe to make sure all the
 #chemical names in the dataset have a match in the category dataframe
+lasar.to.element <- read.xlsx('//deqlead01/wqm/toxics_2012/data/lasar_to_element.xlsx',sheetName = 'Lasar to Element All')
 test <- merge(data, categories.sub, by.x = 'Analyte', by.y = 'Chemical')
 sub <- test[!duplicated(test$Analyte),c('Analyte','Analyte')]
 sub <- rename(sub, c('Analyte.1' = 'categories.Chemical'))
