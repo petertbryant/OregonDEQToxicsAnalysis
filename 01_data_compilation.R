@@ -9,32 +9,52 @@ library(stringr)
 library(reshape2)
 library(xlsx)
 library(ggplot2)
+library(RODBC)
 
 #This prevents scientific notation from being used and forces all imported fields to be character or numeric
 options('scipen' = 50, stringsAsFactors = FALSE)
 
 #Pull in the Element data that is final as of 1/3/2014. This data was queried using the SQL Query tool in Element. The text of that query
 #is commented at the end of this file for future reference. NOTE: there may be an updated method for acquiring this data soon 2/10/14
-data.2012 <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
+element <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
+
+#Pull in Element data from the Repository directly from R. Currently, the work orders below do not inlcude 2013 data.
+con <- odbcConnect('Elm-Repository')
+element <- sqlQuery(con, as.is = TRUE, 'SELECT * 
+                                        FROM Repo_Result 
+                                        WHERE Repo_Result.Work_Order In (1212093, 1212094, 1212092, 1212088, 1212105, 1212103,
+                                                                         1212104, 1212106, 1212005, 1212010, 1212022, 1212067,
+                                                                         1212009, 1212007, 1212102, 1212099, 1212068, 1212071,
+                                                                         1212101, 1212100, 1212108, 1212107, 1212109, 1212110,
+                                                                         1212083, 1212089, 1212081, 1212082, 1211025,
+                                                                         1212002, 1212001, 1211023, 1211024, 1211026)')
+element <- rename(element, c('Station_ID' = 'SampleRegID','Station_Description' = 'SampleAlias', 'Result' = 'tResult', 'MRL' = 'tMRL', 
+                             'Units' = 'Unit'))
 
 #######################################################################################################
-
 #The qualifiers from this query were concatenated into a single field which is kind of a pain to parse so in order to get Status
-#I queried the qualifier table directly and will make a status column that can then be merged with the data table.
-#NOTE: the updated query method should provide a dql column already populated
-data.2012.qualifiers <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Qualifier_Query_for_TMP_on_01032014.csv', stringsAsFactors = FALSE)
+#we query the qualifier table directly and make a status column that can then be merged with the data table.
 
-data.2012.qualifiers$id <- paste(data.2012.qualifiers$Wrk, data.2012.qualifiers$Sample, data.2012.qualifiers$Analysis, data.2012.qualifiers$Analyte)
+#NOTE: As of 2/19/2014 the timeline for getting the DQL column finalized in this output is unknown. Until that time, in order to get the
+#qualifiers the section below can be used to populate them. This process relies on running a query in Element first using the menu
+#Database Admin -> SQL Query... Then under Query name select Qualifiers_by_WorkOrder. Unless somebody has edited this, the work orders
+#from the query above should be in there and all you have to do is click the Query button. Once the query has run you need to export this
+#using the Export button on the right just above the result window. Name it whatever you like, you can see below what I called a previous version.
+#Then you should open it in excel and save it as a .csv. Wherever you put it make sure to change the name of the file being read in on line 45
 
-data.2012.qualifiers$Status <- substr(data.2012.qualifiers$Qualifier, nchar(data.2012.qualifiers$Qualifier),nchar(data.2012.qualifiers$Qualifier))
+element.qualifiers <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Qualifier_Query_for_TMP_on_01032014.csv', stringsAsFactors = FALSE)
 
-data.2012.qualifiers$Status <- as.factor(data.2012.qualifiers$Status)
+element.qualifiers$id <- paste(element.qualifiers$Wrk, element.qualifiers$Sample, element.qualifiers$Analysis, element.qualifiers$Analyte)
 
-data.2012.qualifiers$Status <- revalue(data.2012.qualifiers$Status, c('a' = 1, 'A' = 1, 'b' = 2, 'B' = 2, 'c' = 3, 'C' = 3, 'D' = 4, 'Q' = 1))
+element.qualifiers$Status <- substr(element.qualifiers$Qualifier, nchar(element.qualifiers$Qualifier),nchar(element.qualifiers$Qualifier))
 
-data.2012.qualifiers$Status <- as.numeric(data.2012.qualifiers$Status)
+element.qualifiers$Status <- as.factor(element.qualifiers$Status)
 
-processed <- ddply(data.2012.qualifiers, .(id), summarise, Status = max(Status))
+element.qualifiers$Status <- revalue(element.qualifiers$Status, c('a' = 1, 'A' = 1, 'b' = 2, 'B' = 2, 'c' = 3, 'C' = 3, 'D' = 4, 'Q' = 1))
+
+element.qualifiers$Status <- as.numeric(element.qualifiers$Status)
+
+processed <- ddply(element.qualifiers, .(id), summarise, Status = max(Status))
 
 processed$Status <- as.factor(processed$Status)
 
@@ -45,11 +65,11 @@ processed$AnalyteStatus <- as.character(processed$Status)
 processed <- processed[,c('id','AnalyteStatus')]
 
 #now that the qualifiers have been parsed and the DQL determined we can associate them with the data itself
-data.2012$id <- paste(data.2012$Wrk, data.2012$Sample, data.2012$Analysis, data.2012$Analyte)
-data.2012.w.qualifiers <- merge(data.2012, processed, by = 'id', all.x = TRUE)
+element$id <- paste(element$Wrk, element$Sample, element$Analysis, element$Analyte)
+element.w.qualifiers <- merge(element, processed, by = 'id', all.x = TRUE)
 
 #the above only captures the analyte level qualifiers. the below will also capture the sample level qualifiers
-sample.qualifiers <- data.2012.qualifiers[data.2012.qualifiers$Analyte == '',]
+sample.qualifiers <- element.qualifiers[element.qualifiers$Analyte == '',]
 
 sample.qualifiers$sid <- paste(sample.qualifiers$Wrk, sample.qualifiers$Sample, sample.qualifiers$Analysis)
 
@@ -71,49 +91,58 @@ processed$SampleStatus <- as.character(processed$Status)
 
 processed <- processed[,c('sid','SampleStatus')]
 
-data.2012.w.qualifiers$sid <- paste(data.2012.w.qualifiers$Wrk, data.2012.w.qualifiers$Sample, data.2012.w.qualifiers$Analysis)
-data.2012.w.qualifiers <- merge(data.2012.w.qualifiers, processed, by = 'sid', all.x = TRUE)
+element.w.qualifiers$sid <- paste(element.w.qualifiers$Wrk, element.w.qualifiers$Sample, element.w.qualifiers$Analysis)
+element.w.qualifiers <- merge(element.w.qualifiers, processed, by = 'sid', all.x = TRUE)
 
 #This brings the status into a single column
-data.2012.w.qualifiers$Status <- ifelse(is.na(data.2012.w.qualifiers$AnalyteStatus),
-                                        ifelse(is.na(data.2012.w.qualifiers$SampleStatus),
+element.w.qualifiers$Status <- ifelse(is.na(element.w.qualifiers$AnalyteStatus),
+                                        ifelse(is.na(element.w.qualifiers$SampleStatus),
                                                'A',
-                                               data.2012.w.qualifiers$SampleStatus),
-                                        data.2012.w.qualifiers$AnalyteStatus)
+                                               element.w.qualifiers$SampleStatus),
+                                        element.w.qualifiers$AnalyteStatus)
 
 #All voided samples should be DQL 'D'
-data.2012.w.qualifiers$Status <- ifelse(data.2012.w.qualifiers$tResult %in% c('Void', 'Cancelled'),
+element.w.qualifiers$Status <- ifelse(element.w.qualifiers$tResult %in% c('Void', 'Cancelled'),
                                         'D',
-                                        data.2012.w.qualifiers$Status)
+                                        element.w.qualifiers$Status)
 
 #this simplifies the qualifier and status columns and writes it back to the dataframe name that is used from here on
-data.2012 <- within(data.2012.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
+element <- within(element.w.qualifiers, rm('sid','id','AnalyteStatus','SampleStatus'))
 
 ######################################################################################
 
 #There is a site in the Deschutes basin that was sampled during a John Day basin sampling event and was associated with
 #the John Day Project. This puts it in the right Project for consistency.
-data.2012[data.2012$SampleRegID == 10411,'Project'] <- 'Deschutes'
+element[element$SampleRegID == 10411,'Project'] <- 'Deschutes'
 
 #for this analysis we can leave out blanks and field duplicates (we may want to check the duplicates later and use a detect
 #when we don't have a primary detection)
-data.2012 <- data.2012[!data.2012$SampleType %in% c('Blank - Equipment::EB', 'Blank - Transfer::TfB', 'Field Duplicate::FD'),]
+element <- element[!element$SampleType %in% c('Blank - Equipment::EB', 'Blank - Transfer::TfB', 'Field Duplicate::FD'),]
 
 #we are merging element data with lasar data which means we have to only have the columns that are consistent
 #between the systems. This removes all the element columns that don't have a match in lasar.
-data.2012 <- data.2012[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'SampleType','Analyte','tResult', 'tMRL', 'Unit', 'SpecificMethod', 'Status')]
+element <- element[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'SampleType','Analyte','tResult', 'tMRL', 'Unit', 'SpecificMethod', 'Status')]
 
 #As of 2/14/2014 there are issues with Arsenic naming in the element dataset. Hoepfully this will not be an issue in the new Element data.
 #This is written to only handle it if it is an issue. Otherwise this if block will be skipped.
-if (length(unique(data.2012[grep('rsenic',data.2012$Analyte),'Analyte'])) > 0) {
-  data.2012[data.2012$Analyte %in% c("Arsenic, total inorganic", "Inorganic Arsenic, Total" ),'Analyte'] <- "Arsenic, Total inorganic"
+if (length(unique(element[grep('rsenic',element$Analyte),'Analyte'])) > 0) {
+  element[element$Analyte %in% c("Arsenic, total inorganic", "Inorganic Arsenic, Total" ),'Analyte'] <- "Arsenic, Total inorganic"
 }
 
 #This is the compilation of the Lasar data from the Willamette, Lasar 2011 and Willamette metals data files
 lasar <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/TMP-Lasar-in-Element-Format-02142014.csv', stringsAsFactors = FALSE)
+lasar <- lasar[lasar$Project != '',]
 
 #this puts all of the LASAR and Element data together
-data <- rbind(data.2012, lasar)
+data <- rbind(element, lasar)
+
+#Resolving differences in naming of the same methods
+data$SpecificMethod <- as.factor(data$SpecificMethod)
+data$SpecificMethod <- revalue(data$SpecificMethod, c('8270 D' = 'EPA 8270D', '170.1' = 'EPA 170.1', '1698' = 'EPA 1698', '200.8' = 'EPA 200.8',
+                                                      '2130 B' = 'SM 2130 B', '2510 B' = 'SM 2510 B', '2540 B' = 'SM 2540 D', '4500-H B' = 'SM 4500-H+ B',
+                                                      '4500-O G' = 'SM 4500-O G', '5310 B' = 'SM 5310 B', '6640B' = 'SM 6640', '2540 D' = 'SM 2540 D',
+                                                      '300' = 'EPA 300.0', '9060 A' = 'EPA 9060A', '9060' = 'EPA 9060A', '8270 C' = 'EPA 8270D'))
+data$SpecificMethod <- as.character(data$SpecificMethod)
 
 #There are several stations that have double spaces in their names and several stations that double spaces for some records
 #and not others. This removes those double spaces for consistent naming.

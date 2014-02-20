@@ -3,8 +3,25 @@
 #save to file every time we test it's creation here in R. When we get the final data we will want to change the name of the output excel file
 #to something besides DRAFT. 
 
-#for comparison we need to exclude recently added methods that don't apply to the entire dataset
+#list of all analytes with min, max, median, total samples, total detects, percent detect for each method applied
+statewide.summary <- ddply(data.wo.void, .(Analyte, chem.group,SpecificMethod), summarise, 
+                           min = min(tResult), 
+                           max = max(tResult), 
+                           median = median(tResult), 
+                           N = length(Detect.nondetect), 
+                           detects = sum(Detect.nondetect),
+                           percent.detect = (sum(Detect.nondetect)/length(Detect.nondetect)*100))
+
+#This creates the Data_Summary_DRAFT.xlsx file
+#write.xlsx(statewide.summary,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='StatewideSummary',row.names = FALSE)
+
+#for other comparisons we need to exclude recently added methods that don't apply to the entire dataset
 data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699','EPA 1613', 'EPA 1614A', 'EPA 1668C'),]
+
+#there are also several samples that have multiple methods but those methods are also the only ones used for other samples
+#so we can't just wholesale remove them
+#data.wo.newmethods$code <- paste(data.wo.newmethods$Analyte, data.wo.newmethods$SampleRegID, data.wo.newmethods$Sampled)
+#View(arrange(data.wo.newmethods[data.wo.newmethods$code %in% names(table(data.wo.newmethods$code)[((table(data.wo.newmethods$code)) > 1)]),],code))
 
 #to compare to land use we need to pull that file in
 lu <- read.xlsx('//deqlead03/gis_wa/project_working_folders/toxics/land use maps/attila_toxics_wshds.xlsx', sheetName = 'attila clip')
@@ -30,16 +47,6 @@ dwn.sub <- dwn.sub[!dwn.sub$Analyte %in% c('Antimony, Dissolved','Barium, Dissol
                                            'Copper, Dissolved', 'Iron, Dissolved', 'Lead, Total recoverable', 'Magnesium, Dissolved', 
                                            'Magnesium, Total recoverable', 'Manganese, Dissolved', 'Manganese, Total recoverable',
                                            'Silver, Total recoverable', 'Thallium, Dissolved', 'Molybdenum, Total recoverable'),]
-
-#list of unique detections with counts of nondetects and detects
-detect.counts <- as.data.frame.matrix(table(dwn.sub$Analyte, dwn.sub$Detect.nondetect))
-detect.counts$Analyte <- row.names(detect.counts)
-detect.counts <- rename(detect.counts, c('0' = 'Nondetect', '1' = 'Detect'))
-detect.counts <- merge(detect.counts, categories.sub, by.x = 'Analyte', by.y = 'Chemical', all.x = TRUE)
-detect.counts$PercentDetection <- (detect.counts$Detect/(detect.counts$Nondetect + detect.counts$Detect))*100
-View(arrange(detect.counts,desc(PercentDetection)))
-#This creates the Data_Summary_DRAFT.xlsx file
-#write.xlsx(detect.counts,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='TotalDetects',row.names = FALSE)
 
 #let's look at chemical group by landuse
 by.lu <- ddply(dwn.sub, .(DomLU,chem.group), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})
