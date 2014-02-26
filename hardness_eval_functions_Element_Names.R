@@ -49,9 +49,9 @@ hardness.crit.calc <- function(df, remove.chromium = TRUE) {
   
   mhcm <- mhc.melted[!is.na(mhc.melted$value),]
   
-  mhcm <- rename(mhcm, c('Analyte.metal' = 'Analyte', 'tResult.metal' = 'tResult', 'Type' = 'Type.x'))
+  mhcm <- rename(mhcm, c('Analyte.metal' = 'Analyte', 'tResult.metal' = 'tResult', 'Matrix' = 'Matrix.x'))
   
-  mhcm$Type.y <- 'FW'
+  mhcm$Matrix.y <- 'FW'
   
   mhcm$Pollutant <- mhcm$Analyte
   
@@ -152,11 +152,113 @@ pentachlorophenol.crit.calc <- function(df) {
   
   ppm <- pp.melted[!is.na(pp.melted$value),]
   
-  ppm <- rename(ppm, c('Analyte.penta' = 'Analyte', 'tResult.penta' = 'tResult', 'Type' = 'Type.x'))
+  ppm <- rename(ppm, c('Analyte.penta' = 'Analyte', 'tResult.penta' = 'tResult', 'Matrix' = 'Matrix.x'))
   
-  ppm$Type.y <- 'FW'
+  ppm$Matrix.y <- 'FW'
   
   ppm$Pollutant <- ppm$Analyte
   
   return(ppm)
+}
+
+ammonia.crit.calc <- function(df, salmonids = 'all') {
+  if (salmonids == 'all') {
+    df$salmonids <- TRUE
+  } else if (salmonids == 'none') {
+    df$salmonids <- FALSE
+  } 
+  
+  df$ID <- paste(df$SampleRegID, df$Sampled)
+  
+  amm <- df[df$Analyte == 'Ammonia as N',]
+  
+  ph <- df[df$Analyte == 'pH',c('ID','Analyte','tResult')]
+  
+  temp <- df[df$Analyte == 'Temperature',c('ID','Analyte','tResult')]
+  
+  cond <- df[df$Analyte == 'Conductivity',c('ID','Analyte','tResult')]
+  
+  ap <- merge(amm, ph, by = 'ID', suffixes = c('.amm','.ph'),all.x = TRUE)
+  
+  apt <- merge(ap, temp, by = 'ID', suffixes = c('.ap','.temp'),all.x = TRUE)
+
+  apt$tResult.ph <- as.numeric(apt$tResult.ph)
+  
+  apt$tResult <- as.numeric(apt$tResult)
+  
+  #The freshwater criteria
+  apt.fw <- apt[apt$Matrix == 'FW',]
+  
+  for (i in 1:nrow(apt.fw)) {
+      apt.fw$TCAP.CMC[i] <- ifelse(apt.fw$salmonids[i] == TRUE,20,25)
+      apt.fw$TCAP.CCC[i] <- ifelse(apt.fw$salmonids[i] == TRUE,15,20)
+      
+      apt.fw$FT.CMC[i] <- ifelse(apt.fw$tResult[i] <= apt.fw$TCAP.CMC[i],10^(0.03*(20-apt.fw$tResult[i])),10^(0.03*(20-apt.fw$TCAP.CMC)))
+      apt.fw$FT.CCC[i] <- ifelse(apt.fw$tResult[i] <= apt.fw$TCAP.CCC[i],10^(0.03*(20-apt.fw$tResult[i])),10^(0.03*(20-apt.fw$TCAP.CCC)))
+      
+      apt.fw$FPH[i] <- ifelse(apt.fw$tResult.ph[i] <= 8,((1 + 10^(7.4-apt.fw$tResult.ph[i]))/1.25),1)
+      apt.fw$RATIO[i] <- ifelse(apt.fw$tResult.ph[i] <= 7.7,24*((10^(7.7-apt.fw$tResult.ph[i]))/(1 + 10^(7.4-apt.fw$tResult.ph[i]))),16)
+    
+  }
+    
+  apt.fw$'Table 30 Toxic Substances - Freshwater Acute' <- 0.52/apt.fw$FT.CMC/apt.fw$FPH/2
+  apt.fw$'Table 30 Toxic Substances - Freshwater Chronic' <- 0.80/apt.fw$FT.CCC/apt.fw$FPH/apt.fw$RATIO
+  
+  apt.fw.melted <- melt(apt.fw, measure.vars = c('Table 30 Toxic Substances - Freshwater Acute', 'Table 30 Toxic Substances - Freshwater Chronic'))
+  
+  aptm <- apt.fw.melted[!is.na(apt.fw.melted$value),]
+  
+  aptm$Matrix.y <- 'FW'
+  
+  aptm <- within(aptm, rm(Analyte))
+  
+  #The saltwater criteria
+  aptc <- merge(apt, cond, by = 'ID', suffixes = c('.temp','.cond'),all.x = TRUE)
+  
+  aptc <- aptc[aptc$Matrix == 'SW',]
+  
+  aptc$tResult.cond <- as.numeric(aptc$tResult.cond)
+  
+  #for testing let's actually make these conductivities more saline
+  #set.seed(3000)
+  #aptc$tResult.cond <- rnorm(172, 3000, sd = 500)
+  
+  #to use the Salinity function in the wq package we have to convert to mS
+  aptc$tResult.cond.mS <- aptc$tResult.cond/1000
+  
+  #Then we can actually do the conversion
+  aptc$Salinity <- ec2pss(aptc$tResult.cond.mS, aptc$tResult.temp)
+  
+  #Now that we have Salinity we can use it in the calculation
+  mis <- (19.9273*aptc$Salinity/(1000-1.005109*aptc$Salinity))
+  pk <- ifelse(mis>0.85,NA,9.245+0.116*mis)
+  pu <- (1/(1+10^(pk+0.0324*(298-aptc$tResult.temp-273)+0.0415*1/(aptc$tResult.temp+273)-aptc$tResult.ph)))
+  unionized.acute <- 0.233
+  unionized.chronic <- 0.035
+  totalNH3.acute <- unionized.acute/pu
+  totalNH3.chronic <- unionized.chronic/pu
+  aptc$'Table 30 Toxic Substances - Saltwater Acute' <- totalNH3.acute*0.822
+  aptc$'Table 30 Toxic Substances - Saltwater Chronic' <- totalNH3.chronic*0.822
+  
+  aptc.melted <- melt(aptc, measure.vars = c('Table 30 Toxic Substances - Saltwater Acute', 'Table 30 Toxic Substances - Saltwater Chronic'))
+  
+  aptcm <- aptc.melted[!is.na(aptc.melted$value),]
+  
+  aptcm <- rename(aptcm, c('tResult.temp' = 'tResult'))
+  
+  aptcm$Matrix.y <- 'SW'
+  
+  aptcm <- within(aptcm, rm(Analyte.temp,Analyte.cond,tResult.cond,tResult.cond.mS,Salinity))
+  
+  aptm.sub <- (aptm[,names(aptm)[names(aptm) %in% names(aptcm)]])
+  
+  amm.fw.sw <- rbind(aptcm,aptm.sub)
+  
+  amm.fw.sw$Pollutant <- amm.fw.sw$Analyte.amm
+  
+  amm.fw.sw <- rename(amm.fw.sw, c('Analyte.amm' = 'Analyte', 'Matrix' = 'Matrix.x', 'tResult' = 'tResult.temp', 'tResult.amm' = 'tResult'))
+  
+  return(amm.fw.sw)
+  
+  
 }

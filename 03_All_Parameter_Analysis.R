@@ -24,12 +24,12 @@ data.wo.void$Analyte <- as.character(data.wo.void$Analyte)
 #Some of the criteria apply to Totals and not individual degradates. Here we do that totalling so comparisons can be done.
 #First, we will make a Total DDT
 ddt <- data.wo.void[data.wo.void$Analyte %in% c("4,4`-DDD", "4,4`-DDE", "4,4`-DDT"),]
-ddt.casted <- dcast(ddt, Project + SampleRegID + SampleAlias + 
+ddt.casted <- dcast(ddt, Project + SampleRegID + SampleAlias + Matrix + 
                          Sampled + SampleType + SpecificMethod + chem.group ~ Analyte, value.var = 'tResult')
 ddt.casted$'Total DDT' <- rowSums(ddt.casted[,c("4,4`-DDD", "4,4`-DDE", "4,4`-DDT")],na.rm=TRUE)
 ddt.casted.sub <- within(ddt.casted, rm("4,4`-DDD", "4,4`-DDE", "4,4`-DDT"))
 ddt.melted <- melt(ddt.casted.sub, 
-                   id.vars = c('Project','SampleRegID','SampleAlias','Sampled','SampleType','SpecificMethod','chem.group'),
+                   id.vars = c('Project','SampleRegID','SampleAlias','Sampled','Matrix','SampleType','SpecificMethod','chem.group'),
                    variable.name = 'Analyte',
                    value.name = 'tResult')
 ddt.melted$Detect.nondetect <- ifelse(ddt.melted$tResult > 0,1,0)
@@ -39,11 +39,11 @@ data.wo.void <- rbind(data.wo.void, ddt.melted)
 
 #Now Total Endosulfan
 endo <- data.wo.void[data.wo.void$Analyte %in% c("Endosulfan I", "Endosulfan II", "Endosulfan Sulfate"),]
-endo.casted <- dcast(endo, Project + SampleRegID + SampleAlias + 
+endo.casted <- dcast(endo, Project + SampleRegID + SampleAlias + Matrix +
                       Sampled + SampleType + SpecificMethod + chem.group ~ Analyte, value.var = 'tResult')
 endo.casted$Endosulfan <- rowSums(endo.casted[,c("Endosulfan I", "Endosulfan II", "Endosulfan Sulfate")],na.rm=TRUE)
 endo.casted.sub <- within(endo.casted, rm("Endosulfan I", "Endosulfan II", "Endosulfan Sulfate"))
-endo.melted <- melt(endo.casted.sub, id.vars = c('Project','SampleRegID','SampleAlias','Sampled','SampleType','SpecificMethod','chem.group'),variable.name = 'Analyte',value.name = 'tResult')#melt
+endo.melted <- melt(endo.casted.sub, id.vars = c('Project','SampleRegID','SampleAlias','Sampled','Matrix','SampleType','SpecificMethod','chem.group'),variable.name = 'Analyte',value.name = 'tResult')#melt
 endo.melted$Detect.nondetect <- ifelse(endo.melted$tResult > 0,1,0)
 endo.melted.addons <- data.frame('tMRL' = rep(0,nrow(endo.melted)), 'Unit' = rep('µg/L',nrow(endo.melted)), 'Status' = rep('A',nrow(endo.melted)))
 endo.melted <- cbind(endo.melted, endo.melted.addons)
@@ -51,11 +51,11 @@ data.wo.void <- rbind(data.wo.void, endo.melted)
 
 #Now Total Chlordane
 chlordane <- data.wo.void[data.wo.void$Analyte %in% c("Oxychlordane", "alpha-Chlordane", "cis-Chlordane", 'trans-Chlordane',"gamma-Chlordane+trans-Nonachlor", "trans-Nonachlor", "cis-Nonachlor"),]
-chlordane.casted <- dcast(chlordane, Project + SampleRegID + SampleAlias + 
+chlordane.casted <- dcast(chlordane, Project + SampleRegID + SampleAlias + Matrix +
                        Sampled + SampleType + SpecificMethod + chem.group ~ Analyte, value.var = 'tResult')
 chlordane.casted$Chlordane <- rowSums(chlordane.casted[,c("Oxychlordane", "alpha-Chlordane", "cis-Chlordane", 'trans-Chlordane',"gamma-Chlordane+trans-Nonachlor", "trans-Nonachlor", "cis-Nonachlor")],na.rm=TRUE)
 chlordane.casted.sub <- within(chlordane.casted, rm("Oxychlordane", "alpha-Chlordane", "cis-Chlordane", 'trans-Chlordane',"gamma-Chlordane+trans-Nonachlor", "trans-Nonachlor", "cis-Nonachlor"))
-chlordane.melted <- melt(chlordane.casted.sub, id.vars = c('Project','SampleRegID','SampleAlias','Sampled','SampleType','SpecificMethod','chem.group'),variable.name = 'Analyte',value.name = 'tResult')#melt
+chlordane.melted <- melt(chlordane.casted.sub, id.vars = c('Project','SampleRegID','SampleAlias','Sampled','Matrix','SampleType','SpecificMethod','chem.group'),variable.name = 'Analyte',value.name = 'tResult')#melt
 chlordane.melted$Detect.nondetect <- ifelse(chlordane.melted$tResult > 0,1,0)
 chlordane.melted.addons <- data.frame('tMRL' = rep(0,nrow(chlordane.melted)), 'Unit' = rep('µg/L',nrow(chlordane.melted)), 'Status' = rep('A',nrow(chlordane.melted)))
 chlordane.melted <- cbind(chlordane.melted, chlordane.melted.addons)
@@ -63,22 +63,19 @@ data.wo.void <- rbind(data.wo.void, chlordane.melted)
 
 #Now total PCBs
 pcb <- data.wo.void[grep('PCB',data.wo.void$Analyte),]
-pcb.casted <- dcast(pcb, Project + SampleRegID + SampleAlias + 
+pcb.casted <- dcast(pcb, Project + SampleRegID + SampleAlias + Matrix + 
                             Sampled + SampleType + SpecificMethod + chem.group ~ Analyte, value.var = 'tResult')
 pcb.casted$'Polychlorinated Biphenyls (PCBs)' <- rowSums(pcb.casted[,unique(data.wo.void[grep('PCB',data.wo.void$Analyte),'Analyte'])],na.rm=TRUE)
 pcb.casted.sub <- pcb.casted[,!names(pcb.casted) %in% unique(data.wo.void[grep('PCB',data.wo.void$Analyte),'Analyte'])]
-pcb.melted <- melt(pcb.casted.sub, id.vars = c('Project','SampleRegID','SampleAlias','Sampled','SampleType','SpecificMethod','chem.group'),variable.name = 'Analyte',value.name = 'tResult')#melt
+pcb.melted <- melt(pcb.casted.sub, id.vars = c('Project','SampleRegID','SampleAlias','Sampled','Matrix','SampleType','SpecificMethod','chem.group'),variable.name = 'Analyte',value.name = 'tResult')#melt
 pcb.melted$Detect.nondetect <- ifelse(pcb.melted$tResult > 0,1,0)
 pcb.melted.addons <- data.frame('tMRL' = rep(0,nrow(pcb.melted)), 'Unit' = rep('µg/L',nrow(pcb.melted)), 'Status' = rep('A',nrow(pcb.melted)))
 pcb.melted <- cbind(pcb.melted, pcb.melted.addons)
 data.wo.void <- rbind(data.wo.void, pcb.melted)
 
-#We will want to do some sort of merge with a station table to get Saltwater versus Freshwater designations 
-#for now I am arbitrarily picking two staitons to make saltwater to make sure the associations are working properly
-data.wo.void$Type <- ifelse(data.wo.void$SampleRegID %in% c(10332,37135),'SW','FW')
-
-#Now that we have the type populated we need an ID to match with the criteria
-data.wo.void$ID <- paste(data.wo.void$Analyte, data.wo.void$Type)
+#We need an ID to match with the criteria so we'll simplify the Matrix field
+data.wo.void$Matrix <- mapvalues(data.wo.void$Matrix, from = c("River/Stream", "Estuary"), to = c('FW','SW'))
+data.wo.void$ID <- paste(data.wo.void$Analyte, data.wo.void$Matrix)
 
 #Now that the names are consistent we can match using analyte name and bring in the criteria
 criteria.for.analytes.we.have <- criteria.values.melted.applicable[criteria.values.melted.applicable$Pollutant %in% data.wo.void$Analyte,]
@@ -95,8 +92,15 @@ dvc.hm <- rbind(dvc.wo.hm, hm)
 #Similarly pentachlorophenol is parameter dependent and is handled the same as hardness
 penta <- pentachlorophenol.crit.calc(data.wo.void)
 penta <- penta[,names(dvc)]
-dvc.wo.penta <- dvc[!dvc$Analyte %in% penta$Analyte,]
-dvc.hm <- rbind(dvc.hm, penta)
+dvc.wo.penta <- dvc.hm[!dvc.hm$Analyte %in% penta$Analyte,]
+dvc.penta <- rbind(dvc.wo.penta, penta)
+
+#Ammonia is also parameter dependent and is handled similarly
+amm <- ammonia.crit.calc(data.wo.void)
+amm <- amm[,names(dvc)]
+dvc.wo.amm <- dvc.penta[!dvc.penta$Analyte %in% amm$Analyte,]
+dvc.amm <- rbind(dvc.wo.amm, amm)
+dvc.hm <- dvc.amm
 
 #need to do unit conversion/mapping so the criteria and the results are in the same units
 dvc.hm[dvc.hm$Unit == 'ng/L','tResult'] <- dvc.hm[dvc.hm$Unit == 'ng/L','tResult'] / 1000
@@ -158,8 +162,10 @@ names(casted.exceed) <- make.names(names(casted.exceed))
 dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte,SpecificMethod), summarise, 
                  Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed), 
                  Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only...Exceed), 
-                 Table30.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute...Exceed),
-                 Table30.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic...Exceed),
+                 Table30.FW.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute...Exceed),
+                 Table30.FW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic...Exceed),
+                 Table30.SW.Acute.Exceed = sum(Table.30.Toxic.Substances...Saltwater.Acute),
+                 Table30.SW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Saltwater.Chronic),
                  OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish...Exceed),
                  OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish...Exceed),
                  OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates...Exceed),

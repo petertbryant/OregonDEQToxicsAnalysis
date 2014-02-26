@@ -10,7 +10,8 @@ statewide.summary <- ddply(data.wo.void, .(Analyte, chem.group,SpecificMethod), 
                            median = median(tResult), 
                            N = length(Detect.nondetect), 
                            detects = sum(Detect.nondetect),
-                           percent.detect = (sum(Detect.nondetect)/length(Detect.nondetect)*100))
+                           percent.detect = (sum(Detect.nondetect)/length(Detect.nondetect)*100),
+                           projects = paste(unique(Project), collapse = ','))
 
 #This creates the Data_Summary_DRAFT.xlsx file
 #write.xlsx(statewide.summary,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='StatewideSummary',row.names = FALSE)
@@ -18,9 +19,14 @@ statewide.summary <- ddply(data.wo.void, .(Analyte, chem.group,SpecificMethod), 
 #for other comparisons we need to exclude recently added methods that don't apply to the entire dataset
 data.wo.newmethods <- data.wo.void[!data.wo.void$SpecificMethod %in% c('EPA 1699','EPA 1613', 'EPA 1614A', 'EPA 1668C'),]
 
-#there are also several samples that have multiple methods but those methods are also the only ones used for other samples
-#so we can't just wholesale remove them
-#data.wo.newmethods$code <- paste(data.wo.newmethods$Analyte, data.wo.newmethods$SampleRegID, data.wo.newmethods$Sampled)
+#Pentachlorophenol is reported with two methods currently. This removes the 8270D method.
+data.wo.newmethods$code <- paste(data.wo.newmethods$Analyte, data.wo.newmethods$SampleRegID, data.wo.newmethods$Sampled)
+penta <- data.wo.newmethods[data.wo.newmethods$Analyte == 'Pentachlorophenol',]
+penta <- penta[!rownames(penta) %in% rownames(penta[penta$code %in% penta[duplicated(penta$code),'code'] & penta$SpecificMethod == 'EPA 8270D',]),]
+data.wo.newmethods <- data.wo.newmethods[data.wo.newmethods$Analyte != 'Pentachlorophenol',]
+data.wo.newmethods <- rbind(data.wo.newmethods, penta)
+
+#There are other samples with more than one method but these look to be lab checks mostly on standard parameters. Not going to deal with this right now.
 #View(arrange(data.wo.newmethods[data.wo.newmethods$code %in% names(table(data.wo.newmethods$code)[((table(data.wo.newmethods$code)) > 1)]),],code))
 
 #to compare to land use we need to pull that file in

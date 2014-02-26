@@ -28,12 +28,12 @@ criteria.values <- rename(criteria.values , replace = c('Human.Health.Criteria..
                                                         "Marine.Chronic.Criteria..CCC..ug.L" = 'Table 30 Toxic Substances - Saltwater Chronic'))
 rownames(criteria.values) <- criteria.values[,1]
 criteria.values.melted <- melt(criteria.values, id.vars = 'Pollutant')
-criteria.values.melted$Type <- ifelse(criteria.values.melted$variable %in% c('Table 30 Toxic Substances - Saltwater Acute','Table 30 Toxic Substances - Saltwater Chronic'),
+criteria.values.melted$Matrix <- ifelse(criteria.values.melted$variable %in% c('Table 30 Toxic Substances - Saltwater Acute','Table 30 Toxic Substances - Saltwater Chronic'),
                                       'SW','FW')
 t40oo <- criteria.values.melted[criteria.values.melted$variable == 'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only',]
-t40oo$Type <- 'SW'
+t40oo$Matrix <- 'SW'
 criteria.values.melted <- rbind(criteria.values.melted, t40oo)
-criteria.values.melted$ID <- paste(criteria.values.melted$Pollutant, criteria.values.melted$Type)
+criteria.values.melted$ID <- paste(criteria.values.melted$Pollutant, criteria.values.melted$Matrix)
 criteria.values.melted[criteria.values.melted$ID == 'Arsenic, Total inorganic SW' & criteria.values.melted$variable == 'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only','value'] <- 1
 criteria.values.melted[criteria.values.melted$ID == 'Arsenic, Total recoverable SW' & criteria.values.melted$variable == 'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only','value'] <- 1
 criteria.values.melted[criteria.values.melted$ID == 'Manganese, Total recoverable SW' & criteria.values.melted$variable == 'Table 40 Human Health Criteria for Toxic Pollutants - Organism Only','value'] <- 100

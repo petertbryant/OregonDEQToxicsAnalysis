@@ -16,18 +16,28 @@ options('scipen' = 50, stringsAsFactors = FALSE)
 
 #Pull in the Element data that is final as of 1/3/2014. This data was queried using the SQL Query tool in Element. The text of that query
 #is commented at the end of this file for future reference. NOTE: there may be an updated method for acquiring this data soon 2/10/14
-element <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
+#element <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/Element_Final_Data_Qry_on_01062014.csv', stringsAsFactors = FALSE)
 
-#Pull in Element data from the Repository directly from R. Currently, the work orders below do not inlcude 2013 data.
+#Pull in Element data from the Repository directly from R.
 con <- odbcConnect('Elm-Repository')
-element <- sqlQuery(con, as.is = TRUE, 'SELECT * 
-                                        FROM Repo_Result 
-                                        WHERE Repo_Result.Work_Order In (1212093, 1212094, 1212092, 1212088, 1212105, 1212103,
-                                                                         1212104, 1212106, 1212005, 1212010, 1212022, 1212067,
-                                                                         1212009, 1212007, 1212102, 1212099, 1212068, 1212071,
-                                                                         1212101, 1212100, 1212108, 1212107, 1212109, 1212110,
-                                                                         1212083, 1212089, 1212081, 1212082, 1211025,
-                                                                         1212002, 1212001, 1211023, 1211024, 1211026)')
+#You can query all of the TMP water data
+element <- sqlQuery(con, as.is = TRUE, "SELECT * FROM Repo_Result
+                                        WHERE Repo_Result.Client = 'Toxics Monitoring Program - Water' And
+                                              Repo_Result.Project != 'Bottle Test'")
+odbcCloseAll()
+#or you can query by specific work order. Right now this query should be the same as the one above.
+#element <- sqlQuery(con, as.is = TRUE, 'SELECT * 
+#                                        FROM Repo_Result 
+#                                        WHERE Repo_Result.Work_Order In (1212093, 1212094, 1212092, 1212088, 1212105, 1212103,
+#                                                                         1212104, 1212106, 1212005, 1212010, 1212022, 1212067,
+#                                                                         1212009, 1212007, 1212102, 1212099, 1212068, 1212071,
+#                                                                         1212101, 1212100, 1212108, 1212107, 1212109, 1212110,
+#                                                                         1212083, 1212089, 1212081, 1212082, 1211025,
+#                                                                         1212002, 1212001, 1211023, 1211024, 1211026, 1304007,
+#                                                                         1304008, 1309030, 1309031, 1311053, 1311054, 1309093,
+#                                                                         1305019, 1305020, 1308050, 1308054, 1312002, 1312003, 
+#                                                                         1309090, 1309092, 1309089, 1304071, 1304072, 1304073, 
+#                                                                         1308011, 1308013, 1310083, 1310085)')
 element <- rename(element, c('Station_ID' = 'SampleRegID','Station_Description' = 'SampleAlias', 'Result' = 'tResult', 'MRL' = 'tMRL', 
                              'Units' = 'Unit'))
 
@@ -119,9 +129,18 @@ element[element$SampleRegID == 10411,'Project'] <- 'Deschutes'
 #when we don't have a primary detection)
 element <- element[!element$SampleType %in% c('Blank - Equipment::EB', 'Blank - Transfer::TfB', 'Field Duplicate::FD'),]
 
+#We want matrix brought in but as of 2/21/2014 the matrix coming from the repository is based on what it was assigned at login
+#NOT what it was assigned when Lori updated the Sites/Analysis information for Report Matrix. So what this means is that I found
+#the table with the information Lori updated so we will use that to trump any matrix assignments that have been completed up to this point.
+matrix <- read.csv('//deqlead01/wqm/toxics_2012/sampling_site_information/TMP-SamplingSites-fromElement-02212014.csv')
+matrix <- matrix[,c('SampleRegID','ClientMatrix')]
+matrix <- rename(matrix, c('ClientMatrix' = 'Matrix'))
+element <- within(element, rm('Matrix'))
+element <- merge(element, matrix, by = 'SampleRegID', all.x = TRUE)
+
 #we are merging element data with lasar data which means we have to only have the columns that are consistent
 #between the systems. This removes all the element columns that don't have a match in lasar.
-element <- element[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'SampleType','Analyte','tResult', 'tMRL', 'Unit', 'SpecificMethod', 'Status')]
+element <- element[,c('Project', 'SampleRegID', 'SampleAlias','Sampled', 'SampleType','Matrix','Analyte','tResult', 'tMRL', 'Unit', 'SpecificMethod', 'Status')]
 
 #As of 2/14/2014 there are issues with Arsenic naming in the element dataset. Hoepfully this will not be an issue in the new Element data.
 #This is written to only handle it if it is an issue. Otherwise this if block will be skipped.
@@ -132,6 +151,7 @@ if (length(unique(element[grep('rsenic',element$Analyte),'Analyte'])) > 0) {
 #This is the compilation of the Lasar data from the Willamette, Lasar 2011 and Willamette metals data files
 lasar <- read.csv('//deqlead01/wqm/TOXICS_2012/Data/TMP-Lasar-in-Element-Format-02142014.csv', stringsAsFactors = FALSE)
 lasar <- lasar[lasar$Project != '',]
+lasar$Matrix <- 'River/Stream'
 
 #this puts all of the LASAR and Element data together
 data <- rbind(element, lasar)
@@ -234,7 +254,27 @@ data.wo.void$tResult <- data.wo.void$Result
 #remove the separate Result column to avoid confusion
 data.wo.void <- within(data.wo.void, rm('Result'))
 
+#The lab checks (i think?) are currently being reported in the repository and in lasar. Either way we have duplicates
+#for conductivity, pH and Turbidity. This removes those duplicates where they exist.
+#No preference is being made at this point for one result over the other. They use the same method in a lot of cases and I didn't see a consistent
+#or significant enough difference to bother making the selection more specific since I can't tell which one is the
+#field sample at this point.
+to.pare <- data.wo.void[data.wo.void$Analyte %in% c('Conductivity','pH','Turbidity'),]
+
+data.wo.cpt <- data.wo.void[!data.wo.void$Analyte %in% c('Conductivity','pH','Turbidity'),]
+
+to.pare$code <- paste(to.pare$SampleRegID, to.pare$Sampled, to.pare$Analyte, to.pare$Unit)
+
+to.include <- to.pare[!duplicated(to.pare$code),]
+
+to.include <- within(to.include, rm(code))
+
+data.wo.void <- rbind(data.wo.cpt, to.include)
+
+#This cleans up your workspace keeping only the dataframes necessary to move forward
 rm(list = setdiff(ls(), c('data.wo.void','categories.sub')))
+
+
 
 
 # Select dbo.REPWRK.Client, dbo.REPWRK.Project, dbo.REPWRK.Wrk,
