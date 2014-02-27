@@ -60,6 +60,11 @@ by.lu <- rename(by.lu, c('V1' = 'count'))
 by.lu <- arrange(by.lu, DomLU, chem.group, desc(count))
 by.lu <- arrange(dcast(by.lu, DomLU ~ chem.group),DomLU)
 #write.xlsx(by.lu,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='UniqueCompoundsByGroupByLU',row.names = FALSE,append = TRUE)
+#to check this one you can use the following line and substitute whichever LU or chem group. It's just another way of getting to what
+#the ddply function is doing
+#length(unique(data.w.lu[data.w.lu$DomLU == 'Agriculture' & data.w.lu$chem.group == 
+#                        'Consumer Product Constituents (including Pharmaceuticals & Personal Care Products)' & 
+#                         data.w.lu$Detect.nondetect == 1,'Analyte']))
 
 #number of unique compounds detected per chemical group per station
 by.group <- ddply(dwn.sub, .(Project,SampleRegID,SampleAlias,chem.group,DomLU), function(x) {length(unique(x[x$Detect.nondetect > 0,'Analyte']))})

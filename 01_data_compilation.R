@@ -271,6 +271,14 @@ to.include <- within(to.include, rm(code))
 
 data.wo.void <- rbind(data.wo.cpt, to.include)
 
+#Now that we have only one method per sample, let's rename them so they group together in future analyses. 
+data.wo.void[data.wo.void$Analyte == 'Conductivity','SpecificMethod'] <- 'SM 2510 B'
+data.wo.void[data.wo.void$Analyte == 'pH','SpecificMethod'] <- 'SM 4500-H+ B'
+data.wo.void[data.wo.void$Analyte == 'Turbidity','SpecificMethod'] <- 'SM 2130 B'
+
+#These methods are essentially the same so let's go with our more up to date naming
+data.wo.void[data.wo.void$SpecificMethod == '8321','SpecificMethod'] <- "DEQ 11-LAB-0031-SOP" 
+
 #This cleans up your workspace keeping only the dataframes necessary to move forward
 rm(list = setdiff(ls(), c('data.wo.void','categories.sub')))
 

@@ -1,4 +1,5 @@
 library(plyr)
+library(wq)
 
 #establish the constants to use in the criteria calculations and associate them with
 constants <- data.frame('Name.alone' = c('Cadmium', 'Copper', 'Cadmium', 'Chromium', 'Lead', 'Nickel', 'Silver', 'Zinc'),
@@ -198,11 +199,14 @@ ammonia.crit.calc <- function(df, salmonids = 'all') {
       
       apt.fw$FPH[i] <- ifelse(apt.fw$tResult.ph[i] <= 8,((1 + 10^(7.4-apt.fw$tResult.ph[i]))/1.25),1)
       apt.fw$RATIO[i] <- ifelse(apt.fw$tResult.ph[i] <= 7.7,24*((10^(7.7-apt.fw$tResult.ph[i]))/(1 + 10^(7.4-apt.fw$tResult.ph[i]))),16)
+      
+      apt.fw$pka[i] <- 0.09018+(2729.92/(273.15+apt.fw$tResult[i]))
+      apt.fw$fraction[i] <- 1/(10^(apt.fw$pka[i]-apt.fw$tResult.ph[i])+1)
     
   }
     
-  apt.fw$'Table 30 Toxic Substances - Freshwater Acute' <- 0.52/apt.fw$FT.CMC/apt.fw$FPH/2
-  apt.fw$'Table 30 Toxic Substances - Freshwater Chronic' <- 0.80/apt.fw$FT.CCC/apt.fw$FPH/apt.fw$RATIO
+  apt.fw$'Table 30 Toxic Substances - Freshwater Acute' <- ((0.52/apt.fw$FT.CMC/apt.fw$FPH/2)/apt.fw$fraction)*0.822
+  apt.fw$'Table 30 Toxic Substances - Freshwater Chronic' <- ((0.80/apt.fw$FT.CCC/apt.fw$FPH/apt.fw$RATIO)/apt.fw$fraction)*0.822
   
   apt.fw.melted <- melt(apt.fw, measure.vars = c('Table 30 Toxic Substances - Freshwater Acute', 'Table 30 Toxic Substances - Freshwater Chronic'))
   
@@ -246,7 +250,7 @@ ammonia.crit.calc <- function(df, salmonids = 'all') {
   
   aptcm <- rename(aptcm, c('tResult.temp' = 'tResult'))
   
-  aptcm$Matrix.y <- 'SW'
+  aptcm$Matrix.y <- rep('SW',nrow(aptcm))
   
   aptcm <- within(aptcm, rm(Analyte.temp,Analyte.cond,tResult.cond,tResult.cond.mS,Salinity))
   
