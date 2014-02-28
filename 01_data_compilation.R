@@ -1,5 +1,5 @@
-#This file pulls together three files. One with data from Element. One with toxics data from LASAR and the last with metals data in the 
-#Willamette basin only. The intention is that this file will always be run first and the R session and workspace from this file will be
+#This file pulls together data from two sources. One with data from Element. One with toxics data from LASAR. The intention is that this file 
+#will always be run first and the R session and workspace from this file will be
 #used to feed into the subsequent uses of the data.wo.void composite data frame. The reason for this is to prevent the need to output a file and 
 #import it again for the next script to run.
 
@@ -132,6 +132,8 @@ element <- element[!element$SampleType %in% c('Blank - Equipment::EB', 'Blank - 
 #We want matrix brought in but as of 2/21/2014 the matrix coming from the repository is based on what it was assigned at login
 #NOT what it was assigned when Lori updated the Sites/Analysis information for Report Matrix. So what this means is that I found
 #the table with the information Lori updated so we will use that to trump any matrix assignments that have been completed up to this point.
+#To recreate the source table here run the TMP-Station-Matrix query in the SQLQuery menu within Element (It pulls all stations with a Client
+#of Toxics Monitoring Program - Water).
 matrix <- read.csv('//deqlead01/wqm/toxics_2012/sampling_site_information/TMP-SamplingSites-fromElement-02212014.csv')
 matrix <- matrix[,c('SampleRegID','ClientMatrix')]
 matrix <- rename(matrix, c('ClientMatrix' = 'Matrix'))
@@ -284,7 +286,9 @@ rm(list = setdiff(ls(), c('data.wo.void','categories.sub')))
 
 
 
-
+#The query text that follows is outdated at of 2/27/2014 and is included to preserve documentation of the source for the element file
+#currently listed as an option at the top of this file.
+#
 # Select dbo.REPWRK.Client, dbo.REPWRK.Project, dbo.REPWRK.Wrk,
 # dbo.REPSAMPLE.Sample, dbo.REPSAMPLE.SampleAlias, dbo.REPSAMPLE.SampleRegID,
 # dbo.REPSAMPLE.SampleType, dbo.REPSAMPLE.ClientMatrix, dbo.REPSAMPLE.Sampled,
