@@ -227,11 +227,18 @@ ammonia.crit.calc <- function(df, salmonids = 'all') {
   #set.seed(3000)
   #aptc$tResult.cond <- rnorm(172, 3000, sd = 500)
   
-  #to use the Salinity function in the wq package we have to convert to mS
+    #to use the Salinity function in the wq package we have to convert to mS
   aptc$tResult.cond.mS <- aptc$tResult.cond/1000
   
-  #Then we can actually do the conversion
-  aptc$Salinity <- ec2pss(aptc$tResult.cond.mS, aptc$tResult.temp)
+  #Then we can actually do the conversion - THIS equation appears to only work for actual conductance
+  #aptc$Salinity <- ec2pss(aptc$tResult.cond.mS, aptc$tResult.temp)
+  
+  #This equation comes from http://pubs.usgs.gov/tm/2006/tm1D3/pdf/TM1D3.pdf page 36 
+  #The report says this equation is used to convert specific conductance to salinity
+  aptc$R <- aptc$tResult.cond.mS/53.087
+  aptc$Salinity <- (0.0120 + (-0.2174*(aptc$R^(1/2))) + (25.3283*aptc$R) + (13.7714*(aptc$R^(3/2))) + 
+                    (-6.4788*(aptc$R^2)) + (2.5842*(aptc$R^(5/2))))
+  
   
   #Now that we have Salinity we can use it in the calculation
   mis <- (19.9273*aptc$Salinity/(1000-1.005109*aptc$Salinity))
@@ -252,7 +259,7 @@ ammonia.crit.calc <- function(df, salmonids = 'all') {
   
   aptcm$Matrix.y <- rep('SW',nrow(aptcm))
   
-  aptcm <- within(aptcm, rm(Analyte.temp,Analyte.cond,tResult.cond,tResult.cond.mS,Salinity))
+  aptcm <- within(aptcm, rm(Analyte.temp,Analyte.cond,tResult.cond,tResult.cond.mS,Salinity,R))
   
   aptm.sub <- (aptm[,names(aptm)[names(aptm) %in% names(aptcm)]])
   

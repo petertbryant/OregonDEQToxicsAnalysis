@@ -13,6 +13,16 @@ statewide.summary <- ddply(data.wo.void, .(Analyte, chem.group,SpecificMethod), 
                            percent.detect = (sum(Detect.nondetect)/length(Detect.nondetect)*100),
                            projects = paste(unique(Project), collapse = ','))
 
+#for method matrix we will pull out the dissolved oxygen cause it's a MESS
+data.wo.do <- data.wo.void[data.wo.void$Analyte != 'Dissolved Oxygen',]
+#to get year we need to separate it out
+data.wo.do$year <- ifelse(substr(data.wo.do$Sampled,4,4) %in% c('2','3'),substr(data.wo.do$Sampled,1,4),
+                          paste('20',substring(data.wo.do$Sampled,nchar(data.wo.do$Sampled)-1,nchar(data.wo.do$Sampled)),sep=''))
+data.sub <- data.wo.do[!data.wo.do$chem.group %in% c('Standard Parameters','NA'),]
+#A couple options
+by.method.only <- (dcast(data.sub, SpecificMethod ~ Project, value.var = 'year', fun.aggregate = function(x) {paste(unique(x),collapse=", ")}))
+by.method.group <- arrange(dcast(data.sub, SpecificMethod + chem.group ~ Project, value.var = 'year', fun.aggregate = function(x) {paste(unique(x),collapse=", ")}),chem.group)
+
 #This creates the Data_Summary_DRAFT.xlsx file
 #write.xlsx(statewide.summary,'//deqlead01/wqm/toxics_2012/data/r/Data_Summary_DRAFT.xlsx',sheetName='StatewideSummary',row.names = FALSE)
 

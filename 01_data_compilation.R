@@ -163,7 +163,8 @@ data$SpecificMethod <- as.factor(data$SpecificMethod)
 data$SpecificMethod <- revalue(data$SpecificMethod, c('8270 D' = 'EPA 8270D', '170.1' = 'EPA 170.1', '1698' = 'EPA 1698', '200.8' = 'EPA 200.8',
                                                       '2130 B' = 'SM 2130 B', '2510 B' = 'SM 2510 B', '2540 B' = 'SM 2540 D', '4500-H B' = 'SM 4500-H+ B',
                                                       '4500-O G' = 'SM 4500-O G', '5310 B' = 'SM 5310 B', '6640B' = 'SM 6640', '2540 D' = 'SM 2540 D',
-                                                      '300' = 'EPA 300.0', '9060 A' = 'EPA 9060A', '9060' = 'EPA 9060A', '8270 C' = 'EPA 8270D'))
+                                                      '300' = 'EPA 300.0', '9060 A' = 'EPA 9060A', '9060' = 'EPA 9060A', '8270 C' = 'EPA 8270D',
+                                                      '1694' = 'DEQ 11-LAB-0031-SOP'))
 data$SpecificMethod <- as.character(data$SpecificMethod)
 
 #There are several stations that have double spaces in their names and several stations that double spaces for some records

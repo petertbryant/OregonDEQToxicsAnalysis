@@ -95,6 +95,9 @@ penta <- penta[,names(dvc)]
 dvc.wo.penta <- dvc.hm[!dvc.hm$Analyte %in% penta$Analyte,]
 dvc.penta <- rbind(dvc.wo.penta, penta)
 
+#make a couple sites saltwater for testing
+#data.wo.void[data.wo.void$SampleRegID %in% c(28574,13141),'Matrix'] <- 'SW'
+
 #Ammonia is also parameter dependent and is handled similarly
 amm <- ammonia.crit.calc(data.wo.void)
 amm <- amm[,names(dvc)]
@@ -119,7 +122,7 @@ dvc.hm$magnitude <- dvc.hm$tResult/dvc.hm$value
 #first make an id column to pull together the columns since each casting can only handle one compiled column
 #at a time for the exceed, criteria value and magnitude/ratio
 dvc.hm$ID <- paste(dvc.hm$Analyte, dvc.hm$Project, dvc.hm$SampleRegID, dvc.hm$SampleAlias, dvc.hm$Sampled, dvc.hm$SampleType, dvc.hm$tResult, dvc.hm$tMRL, dvc.hm$Unit, dvc.hm$SpecificMethod, dvc.hm$Status, dvc.hm$chem.group, dvc.hm$Detect.nondetect, sep='-')
-casted.exceed <- dcast(dvc.hm, ID + Project + SampleRegID + SampleAlias + Sampled + SampleType + Analyte + 
+casted.exceed <- dcast(dvc.hm, ID + Project + SampleRegID + SampleAlias + Matrix.x + Sampled + SampleType + Analyte + 
                   tResult + tMRL + Unit + SpecificMethod + Status + chem.group + Detect.nondetect ~ variable, value.var = 'exceed',
                 fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),sum(as.numeric(x)))})
 
@@ -130,14 +133,14 @@ casted.magnitude <- dcast(dvc.hm, ID ~ variable, value.var = 'magnitude',
                           fun.aggregate = function(x){ifelse(length(x) == 0,as.numeric(NA),as.numeric(x))})
 
 #Now we need to make sure the column names reflect what was calculated 
-casted.exceed <- rename(casted.exceed, sapply(names(casted.exceed)[15:26],FUN = function(x) {paste(x, 'Exceed', sep = ' - ')}))
-casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:13],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
-casted.magnitude <- rename(casted.magnitude, sapply(names(casted.magnitude)[2:13],FUN = function(x) {paste(x, 'Magnitude', sep = ' - ')}))
+casted.exceed <- rename(casted.exceed, sapply(names(casted.exceed)[16:length(names(casted.exceed))],FUN = function(x) {paste(x, 'Exceed', sep = ' - ')}))
+casted.crit <- rename(casted.crit, sapply(names(casted.crit)[2:length(casted.crit)],FUN = function(x) {paste(x, 'Criteria Value', sep = ' - ')}))
+casted.magnitude <- rename(casted.magnitude, sapply(names(casted.magnitude)[2:length(casted.magnitude)],FUN = function(x) {paste(x, 'Magnitude', sep = ' - ')}))
 
 #Now we remove the NA column which is an artifact from those analytes that don't associate to a criteria or benchmark
-casted.exceed <- casted.exceed[,setdiff(names(casted.exceed),'NA')]
-casted.crit <- casted.crit[,setdiff(names(casted.crit),'NA')]
-casted.magnitude <- casted.magnitude[,setdiff(names(casted.magnitude),'NA')]
+casted.exceed <- casted.exceed[,setdiff(names(casted.exceed),'NA - Exceed')]
+casted.crit <- casted.crit[,setdiff(names(casted.crit),'NA - Criteria Value')]
+casted.magnitude <- casted.magnitude[,setdiff(names(casted.magnitude),'NA - Magnitude')]
 
 #Now we put them together
 cec <- merge(casted.exceed, casted.crit, by = 'ID')
@@ -159,23 +162,42 @@ names(casted.exceed) <- make.names(names(casted.exceed))
 #Here is where the summary happens. Summing the exceedances for each Standard or Benchmark 
 #NOTE: might want to consider adding percent exceed for each criteria or at least the DEQ Tables
 #code would look like(untested): Table40.WO.Percent.Exceed = (sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed)/length(Detect.nondetect))*100
-dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte,SpecificMethod), summarise, 
-                 Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed), 
-                 Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only...Exceed), 
-                 Table30.FW.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute...Exceed),
-                 Table30.FW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic...Exceed),
-                 Table30.SW.Acute.Exceed = sum(Table.30.Toxic.Substances...Saltwater.Acute),
-                 Table30.SW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Saltwater.Chronic),
-                 OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish...Exceed),
-                 OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish...Exceed),
-                 OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates...Exceed),
-                 OPP.Chronic.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Invertebrates...Exceed),
-                 OPP.Acute.Nonvascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Nonvascular.Plants...Exceed),
-                 OPP.Acute.Vascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Vascular.Plants...Exceed),
-                 Office.of.Water.Acute.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Maximum.Concentration..CMC....Exceed),
-                 Office.of.Water.Chronic.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Continuous.Concentration..CCC....Exceed),
-                 sample.count = length(Detect.nondetect), 
-                 detect.count = sum(Detect.nondetect, na.rm = TRUE))
+if (any(names(casted.exceed) %in% c('Table.30.Toxic.Substances...Saltwater.Acute...Exceed','Table.30.Toxic.Substances...Saltwater.Chronic...Exceed'))) {
+  dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte,SpecificMethod), summarise, 
+                     Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed), 
+                     Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only...Exceed), 
+                     Table30.FW.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute...Exceed),
+                     Table30.FW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic...Exceed),
+                     Table30.SW.Acute.Exceed = sum(Table.30.Toxic.Substances...Saltwater.Acute...Exceed),
+                     Table30.SW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Saltwater.Chronic...Exceed),
+                     OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish...Exceed),
+                     OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish...Exceed),
+                     OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates...Exceed),
+                     OPP.Chronic.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Invertebrates...Exceed),
+                     OPP.Acute.Nonvascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Nonvascular.Plants...Exceed),
+                     OPP.Acute.Vascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Vascular.Plants...Exceed),
+                     Office.of.Water.Acute.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Maximum.Concentration..CMC....Exceed),
+                     Office.of.Water.Chronic.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Continuous.Concentration..CCC....Exceed),
+                     sample.count = length(Detect.nondetect), 
+                     detect.count = sum(Detect.nondetect, na.rm = TRUE))
+} else {
+  dvc.hm.ru <- ddply(casted.exceed, .(Project,SampleRegID,SampleAlias,chem.group,Analyte,SpecificMethod), summarise, 
+                     Table40.WO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Water...Organism...Exceed), 
+                     Table40.OO.Exceed = sum(Table.40.Human.Health.Criteria.for.Toxic.Pollutants...Organism.Only...Exceed), 
+                     Table30.FW.Acute.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Acute...Exceed),
+                     Table30.FW.Chronic.Exceed = sum(Table.30.Toxic.Substances...Freshwater.Chronic...Exceed),
+                     OPP.Acute.Fish = sum(OPP.Aquatic.Life.Benchmarks...Acute.Fish...Exceed),
+                     OPP.Chronic.Fish = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Fish...Exceed),
+                     OPP.Acute.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Acute.Invertebrates...Exceed),
+                     OPP.Chronic.Invertebrates = sum(OPP.Aquatic.Life.Benchmarks...Chronic.Invertebrates...Exceed),
+                     OPP.Acute.Nonvascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Nonvascular.Plants...Exceed),
+                     OPP.Acute.Vascular.Plants = sum(OPP.Aquatic.Life.Benchmarks...Acute.Vascular.Plants...Exceed),
+                     Office.of.Water.Acute.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Maximum.Concentration..CMC....Exceed),
+                     Office.of.Water.Chronic.ALC = sum(Office.of.Water.Aquatic.Life.Criteria...Continuous.Concentration..CCC....Exceed),
+                     sample.count = length(Detect.nondetect), 
+                     detect.count = sum(Detect.nondetect, na.rm = TRUE))
+}
+
 dvc.hm.ru$percent.detect <- round(100*(dvc.hm.ru$detect.count/dvc.hm.ru$sample.count))
 
 #This is also ready to be output now
