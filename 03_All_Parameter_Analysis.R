@@ -1,8 +1,6 @@
 #This script matches the analytes to a corresponding criteria in either a DEQ Water Quality Standard table,
 #an Office of Pesticide benchmark or and Office of Water benchmark where applicable.
 
-#This is a test commit
-
 #This brings in the criteria table and the constants necessary for harndess calculations
 source('//deqlead01/wqm/TOXICS_2012/Data/R/criteria.R')
 
